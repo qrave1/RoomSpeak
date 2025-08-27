@@ -123,6 +123,42 @@
             color: #677bc4;
             margin-top: 20px;
         }
+
+        /* Стили для select */
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #202225;
+            border-radius: 4px;
+            background-color: #40444b;
+            color: #ffffff;
+            font-size: 14px;
+            outline: none;
+            box-sizing: border-box;
+            appearance: none; /* убираем системную стрелку */
+            background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 16px;
+            cursor: pointer;
+        }
+
+        /* При наведении */
+        select:hover {
+            border-color: #677bc4;
+        }
+
+        /* При фокусе */
+        select:focus {
+            border-color: #7289da;
+        }
+
+        /* Стили для опций */
+        select option {
+            background-color: #2f3136;
+            color: #ffffff;
+            padding: 10px;
+        }
     </style>
 </head>
 

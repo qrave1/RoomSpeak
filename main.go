@@ -165,6 +165,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		pc:         pc,
 		audioTrack: audioTrack,
 	}
+
 	slog.Info("WebSocket connection established", "client_id", client.id)
 
 	defer func() {
