@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/google/uuid"
@@ -131,7 +132,7 @@ func createPeerConnection() (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP
 	}
 
 	audioTrack, err := webrtc.NewTrackLocalStaticRTP(
-		webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "hecs",
+		webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "RoomSpeak",
 	)
 	if err != nil {
 		return nil, nil, err
@@ -277,8 +278,32 @@ func handleClientMessage(c *Client, msg []byte) error {
 }
 
 func main() {
-	http.Handle("/", http.FileServer(http.Dir("web")))
-	http.HandleFunc("/ws", handleWebSocket)
-	slog.Info("Server starting", "port", "3000")
-	http.ListenAndServe(":3000", nil)
+	slog.SetDefault(
+		slog.New(
+			slog.NewJSONHandler(
+				os.Stdout,
+				&slog.HandlerOptions{Level: slog.LevelInfo},
+			),
+		),
+	)
+
+	mux := http.NewServeMux()
+
+	mux.Handle("/", http.FileServer(http.Dir("web")))
+	mux.HandleFunc("/ws", handleWebSocket)
+
+	slog.Info(
+		"HTTP server starting",
+		slog.Any("port", "3000"),
+	)
+
+	err := http.ListenAndServe(":3000", mux)
+	if err != nil {
+		slog.Error(
+			"HTTP server failed",
+			slog.Any("error", err),
+		)
+
+		os.Exit(1)
+	}
 }
