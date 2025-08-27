@@ -3,14 +3,14 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/pion/rtp"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 var (
@@ -64,6 +64,7 @@ func NewRoom(id string) *Room {
 }
 
 func (r *Room) AddClient(c *Client) {
+	slog.Info("Client joined room", "client_id", c.id, "client_name", c.name, "room_id", r.id)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.clients[c.id] = c
@@ -74,9 +75,9 @@ func (r *Room) AddClient(c *Client) {
 func (r *Room) RemoveClient(clientID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	slog.Info("Client left room", "client_id", clientID, "room_id", r.id)
 	delete(r.clients, clientID)
 
-	// отправляем информацию об удалении клиента всем остальным
 	r.broadcastParticipants()
 
 	if len(r.clients) == 0 {
@@ -104,36 +105,19 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
 			continue
 		}
 
-		go func(c *Client) {
-			c.mu.Lock()
-			defer c.mu.Unlock()
-
-			// Обновляем параметры пакета для получателя
-			pkt.Header.SequenceNumber = c.sequenceNumber
-			pkt.Header.Timestamp = c.timestamp
-			pkt.Header.SSRC = c.ssrc
-
-			if err := c.audioTrack.WriteRTP(pkt); err != nil {
-				log.Printf("RTP write error: %v", err)
-			}
-
-			c.sequenceNumber++
-			c.timestamp += 960 // 48kHz * 20ms
-		}(client)
+		if err := client.audioTrack.WriteRTP(pkt); err != nil {
+			slog.Error("RTP write error", "error", err)
+		}
 	}
 }
 
 type Client struct {
-	id             string
-	name           string
-	conn           *websocket.Conn
-	pc             *webrtc.PeerConnection
-	room           *Room
-	audioTrack     *webrtc.TrackLocalStaticRTP
-	sequenceNumber uint16
-	timestamp      uint32
-	ssrc           uint32
-	mu             sync.Mutex
+	id         string
+	name       string
+	conn       *websocket.Conn
+	pc         *webrtc.PeerConnection
+	room       *Room
+	audioTrack *webrtc.TrackLocalStaticRTP
 }
 
 func createPeerConnection() (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, error) {
@@ -163,14 +147,14 @@ func createPeerConnection() (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		slog.Error("WebSocket upgrade error", "error", err)
 		return
 	}
 	defer conn.Close()
 
 	pc, audioTrack, err := createPeerConnection()
 	if err != nil {
-		log.Printf("PeerConnection error: %v", err)
+		slog.Error("PeerConnection error", "error", err)
 		return
 	}
 
@@ -179,8 +163,8 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn:       conn,
 		pc:         pc,
 		audioTrack: audioTrack,
-		ssrc:       uuid.New().ID(),
 	}
+	slog.Info("WebSocket connection established", "client_id", client.id)
 
 	defer func() {
 		if client.room != nil {
@@ -214,14 +198,28 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 
+	pc.OnConnectionStateChange(
+		func(state webrtc.PeerConnectionState) {
+			switch state {
+			case webrtc.PeerConnectionStateFailed:
+				slog.Warn("PeerConnection state failed", "client_id", client.id)
+				pc.Close()
+			case webrtc.PeerConnectionStateDisconnected:
+				slog.Warn("PeerConnection state disconnected", "client_id", client.id)
+			default:
+			}
+		},
+	)
+
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("WebSocket read error: %v", err)
+			slog.Error("WebSocket read error", "error", err)
 			return
 		}
+
 		if err := handleClientMessage(client, msg); err != nil {
-			log.Printf("Message handling error: %v", err)
+			slog.Error("Message handling error", "error", err)
 			return
 		}
 	}
@@ -281,6 +279,6 @@ func handleClientMessage(c *Client, msg []byte) error {
 func main() {
 	http.Handle("/", http.FileServer(http.Dir("web")))
 	http.HandleFunc("/ws", handleWebSocket)
-	log.Println("Server starting on :3000")
-	log.Fatal(http.ListenAndServe(":3000", nil))
+	slog.Info("Server starting", "port", "3000")
+	http.ListenAndServe(":3000", nil)
 }
