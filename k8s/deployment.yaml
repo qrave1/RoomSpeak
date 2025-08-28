@@ -7,7 +7,7 @@ metadata:
     app: roomspeak
     environment: production
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: roomspeak
@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: roomspeak-backend
-          image: ghcr.io/qrave1/roomspeak:2025_08_28_11_23_51
+          image: ghcr.io/qrave1/roomspeak:2025_08_28_16_04_51
           ports:
             - containerPort: 3000
               protocol: TCP

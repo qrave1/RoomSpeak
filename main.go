@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
 )
@@ -104,7 +106,7 @@ func (r *Room) broadcastParticipants() {
 	}
 
 	for _, client := range r.clients {
-		client.conn.WriteJSON(map[string]interface{}{"type": "participants", "list": parts})
+		client.wsConn.WriteJSON(map[string]interface{}{"type": "participants", "list": parts})
 	}
 }
 
@@ -126,8 +128,8 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
 type Client struct {
 	id         string
 	name       string
-	conn       *websocket.Conn
-	pc         *webrtc.PeerConnection
+	wsConn     *websocket.Conn
+	peerConn   *webrtc.PeerConnection
 	room       *Room
 	audioTrack *webrtc.TrackLocalStaticRTP
 }
@@ -156,24 +158,24 @@ func createPeerConnection() (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP
 	return pc, audioTrack, nil
 }
 
-func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+func handleWebSocket(c echo.Context) error {
+	ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		slog.Error("WebSocket upgrade error", "error", err)
-		return
+		return c.String(http.StatusBadRequest, "upgrade error")
 	}
-	defer conn.Close()
+	defer ws.Close()
 
 	pc, audioTrack, err := createPeerConnection()
 	if err != nil {
 		slog.Error("PeerConnection error", "error", err)
-		return
+		return c.String(http.StatusBadRequest, "peer connection error")
 	}
 
 	client := &Client{
 		id:         uuid.NewString(),
-		conn:       conn,
-		pc:         pc,
+		wsConn:     ws,
+		peerConn:   pc,
 		audioTrack: audioTrack,
 	}
 
@@ -212,7 +214,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			conn.WriteJSON(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
+			ws.WriteJSON(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
 		},
 	)
 
@@ -230,15 +232,15 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	)
 
 	for {
-		_, msg, err := conn.ReadMessage()
+		_, msg, err := ws.ReadMessage()
 		if err != nil {
 			slog.Error("WebSocket read error", "error", err)
-			return
+
+			return c.String(http.StatusBadRequest, "read ws message error")
 		}
 
 		if err := handleClientMessage(client, msg); err != nil {
 			slog.Error("Message handling error", "error", err)
-			return
 		}
 	}
 }
@@ -269,7 +271,7 @@ func handleClientMessage(c *Client, msg []byte) error {
 			return err
 		}
 
-		if err := c.pc.SetRemoteDescription(
+		if err := c.peerConn.SetRemoteDescription(
 			webrtc.SessionDescription{
 				Type: webrtc.SDPTypeOffer, SDP: data.SDP,
 			},
@@ -277,16 +279,16 @@ func handleClientMessage(c *Client, msg []byte) error {
 			return err
 		}
 
-		answer, err := c.pc.CreateAnswer(nil)
+		answer, err := c.peerConn.CreateAnswer(nil)
 		if err != nil {
 			return err
 		}
 
-		if err = c.pc.SetLocalDescription(answer); err != nil {
+		if err = c.peerConn.SetLocalDescription(answer); err != nil {
 			return err
 		}
 
-		return c.conn.WriteJSON(map[string]interface{}{"type": "answer", "sdp": answer.SDP})
+		return c.wsConn.WriteJSON(map[string]interface{}{"type": "answer", "sdp": answer.SDP})
 
 	case "candidate":
 		var data struct{ Candidate webrtc.ICECandidateInit }
@@ -294,13 +296,46 @@ func handleClientMessage(c *Client, msg []byte) error {
 			return err
 		}
 
-		return c.pc.AddICECandidate(data.Candidate)
+		return c.peerConn.AddICECandidate(data.Candidate)
 
 	default:
 		return errors.New("unknown message type")
 	}
 
 	return nil
+}
+
+// Кастомный логгер через slog
+func SlogLogger() echo.MiddlewareFunc {
+	return middleware.RequestLoggerWithConfig(
+		middleware.RequestLoggerConfig{
+			LogStatus: true,
+			LogURI:    true,
+			LogMethod: true,
+			LogError:  true,
+
+			LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+				level := slog.LevelInfo
+				if v.Error != nil || v.Status >= http.StatusInternalServerError {
+					level = slog.LevelError
+				} else if v.Status >= http.StatusBadRequest {
+					level = slog.LevelWarn
+				}
+
+				slog.LogAttrs(
+					c.Request().Context(),
+					level,
+					"HTTP request",
+					slog.String("method", v.Method),
+					slog.String("uri", v.URI),
+					slog.Int("status", v.Status),
+					slog.String("remote_ip", c.RealIP()),
+				)
+
+				return nil
+			},
+		},
+	)
 }
 
 func main() {
@@ -313,17 +348,14 @@ func main() {
 		),
 	)
 
-	mux := http.NewServeMux()
+	e := echo.New()
 
-	mux.Handle("/", http.FileServer(http.Dir("web")))
-	mux.HandleFunc("/ws", handleWebSocket)
+	e.Use(SlogLogger())
 
-	slog.Info(
-		"HTTP server starting",
-		slog.Any("port", "3000"),
-	)
+	e.Static("/", "web")
+	e.GET("/ws", handleWebSocket)
 
-	err := http.ListenAndServe(":3000", mux)
+	err := e.Start(":3000")
 	if err != nil {
 		slog.Error(
 			"HTTP server failed",

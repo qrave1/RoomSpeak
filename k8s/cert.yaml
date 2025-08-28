@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: roomspeak-tls
+  namespace: roomspeak-prod
+spec:
+  secretName: roomspeak-tls           # этот секрет Traefik будет использовать
+  dnsNames:
+    - xxsm.ru                          # твой домен
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
