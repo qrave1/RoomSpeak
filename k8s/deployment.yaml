@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: roomspeak-backend
-  namespace: room-speak-prod
+  namespace: roomspeak-prod
   labels:
     app: roomspeak
     environment: production
