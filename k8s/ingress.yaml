@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: roomspeak-prod
+  name: roomspeak-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - xxsm.ru
+      secretName: roomspeak-tls
+  rules:
+    - host: xxsm.ru
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: roomspeak-svc
+                port:
+                  number: 80
