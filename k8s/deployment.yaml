@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: roomspeak-backend
+  namespace: room-speak-prod
+  labels:
+    app: roomspeak
+    environment: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: roomspeak
+  template:
+    metadata:
+      labels:
+        app: roomspeak
+        environment: production
+    spec:
+      containers:
+        - name: roomspeak-backend
+          image: ghcr.io/qrave1/roomspeak:2025_08_28_11_23_51
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          resources:
+            requests:
+              memory: "1Mi"
+            limits:
+              memory: "256Mi"

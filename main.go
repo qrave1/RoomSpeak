@@ -16,7 +16,10 @@ import (
 
 var (
 	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
+		CheckOrigin: func(r *http.Request) bool {
+			// TODO: тянуть из конфига
+			return r.Header.Get("Origin") == "https://xxsm.ru"
+		},
 	}
 	roomManager = NewRoomManager()
 )
@@ -41,13 +44,16 @@ func (rm *RoomManager) GetOrCreate(roomID string) *Room {
 	}
 
 	room := NewRoom(roomID)
+
 	rm.rooms[roomID] = room
+
 	return room
 }
 
 func (rm *RoomManager) Remove(roomID string) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
+
 	delete(rm.rooms, roomID)
 }
 
@@ -66,8 +72,10 @@ func NewRoom(id string) *Room {
 
 func (r *Room) AddClient(c *Client) {
 	slog.Info("Client joined room", "client_id", c.id, "client_name", c.name, "room_id", r.id)
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	r.clients[c.id] = c
 
 	r.broadcastParticipants()
@@ -76,7 +84,9 @@ func (r *Room) AddClient(c *Client) {
 func (r *Room) RemoveClient(clientID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	slog.Info("Client left room", "client_id", clientID, "room_id", r.id)
+
 	delete(r.clients, clientID)
 
 	r.broadcastParticipants()
@@ -88,6 +98,7 @@ func (r *Room) RemoveClient(clientID string) {
 
 func (r *Room) broadcastParticipants() {
 	parts := make([]string, 0, len(r.clients))
+
 	for _, client := range r.clients {
 		parts = append(parts, client.name)
 	}
@@ -172,6 +183,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if client.room != nil {
 			client.room.RemoveClient(client.id)
 		}
+
 		pc.Close()
 	}()
 
@@ -182,8 +194,11 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 					for {
 						pkt, _, err := track.ReadRTP()
 						if err != nil {
+							slog.Error("RTP read error", "error", err)
+
 							return
 						}
+
 						client.room.BroadcastRTP(pkt, client.id)
 					}
 				}()
@@ -196,6 +211,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			if c == nil {
 				return
 			}
+
 			conn.WriteJSON(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
 		},
 	)
@@ -240,8 +256,11 @@ func handleClientMessage(c *Client, msg []byte) error {
 			return err
 		}
 		c.name = data.Name
+
 		room := roomManager.GetOrCreate(data.Room)
+
 		room.AddClient(c)
+
 		c.room = room
 
 	case "offer":
@@ -249,6 +268,7 @@ func handleClientMessage(c *Client, msg []byte) error {
 		if err := json.Unmarshal(msg, &data); err != nil {
 			return err
 		}
+
 		if err := c.pc.SetRemoteDescription(
 			webrtc.SessionDescription{
 				Type: webrtc.SDPTypeOffer, SDP: data.SDP,
@@ -256,13 +276,16 @@ func handleClientMessage(c *Client, msg []byte) error {
 		); err != nil {
 			return err
 		}
+
 		answer, err := c.pc.CreateAnswer(nil)
 		if err != nil {
 			return err
 		}
+
 		if err = c.pc.SetLocalDescription(answer); err != nil {
 			return err
 		}
+
 		return c.conn.WriteJSON(map[string]interface{}{"type": "answer", "sdp": answer.SDP})
 
 	case "candidate":
@@ -270,11 +293,13 @@ func handleClientMessage(c *Client, msg []byte) error {
 		if err := json.Unmarshal(msg, &data); err != nil {
 			return err
 		}
+
 		return c.pc.AddICECandidate(data.Candidate)
 
 	default:
 		return errors.New("unknown message type")
 	}
+
 	return nil
 }
 
