@@ -96,10 +96,6 @@ func (r *Room) RemoveClient(clientID string) {
 	delete(r.clients, clientID)
 
 	r.broadcastParticipants()
-
-	if len(r.clients) == 0 {
-		roomManager.Remove(r.id)
-	}
 }
 
 func (r *Room) broadcastParticipants() {
@@ -187,7 +183,11 @@ func handleWebSocket(c echo.Context) error {
 
 	defer func() {
 		if client.room != nil {
-			client.room.RemoveClient(client.id)
+			if len(client.room.clients) == 0 {
+				roomManager.Remove(client.room.id)
+			} else {
+				client.room.RemoveClient(client.id)
+			}
 		}
 
 		pc.Close()
@@ -257,13 +257,13 @@ func handleClientMessage(c *Client, msg []byte) error {
 
 	switch base.Type {
 	case "join":
-		var data struct{ Name, Room string }
+		var data struct{ Name, RoomID string }
 		if err := json.Unmarshal(msg, &data); err != nil {
 			return err
 		}
 		c.name = data.Name
 
-		room := roomManager.GetOrCreate(data.Room)
+		room := roomManager.GetOrCreate(data.RoomID)
 
 		room.AddClient(c)
 
