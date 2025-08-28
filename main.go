@@ -16,10 +16,14 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+type Config struct {
+	Debug bool   `env:"DEBUG" envDefault:"true"`
+	Port  string `env:"PORT" envDefault:"3000"`
+}
+
 var (
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			// TODO: тянуть из конфига
 			return r.Header.Get("Origin") == "https://xxsm.ru"
 		},
 	}
