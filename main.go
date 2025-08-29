@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,8 +20,16 @@ import (
 )
 
 type Config struct {
-	Debug bool   `env:"DEBUG" envDefault:"true"`
-	Port  string `env:"PORT" envDefault:"3000"`
+	Debug      bool   `env:"DEBUG" envDefault:"true"`
+	Port       string `env:"PORT" envDefault:"3000"`
+	Domain     string `env:"DOMAIN" envDefault:"xxsm.ru"`
+	TurnServer TurnServerConfig
+}
+
+type TurnServerConfig struct {
+	URL      string `env:"TURN_URL,required"`
+	Username string `env:"TURN_USERNAME,required"`
+	Password string `env:"TURN_PASSWORD,required"`
 }
 
 type RoomManager struct {
@@ -127,7 +136,7 @@ type Client struct {
 	audioTrack *webrtc.TrackLocalStaticRTP
 }
 
-func createPeerConnection() (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, error) {
+func createPeerConnection(cfg *Config) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, error) {
 	pc, err := webrtc.NewPeerConnection(
 		webrtc.Configuration{
 			ICEServers: []webrtc.ICEServer{
@@ -135,9 +144,9 @@ func createPeerConnection() (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP
 					URLs: []string{"stun:stun.l.google.com:19302"},
 				},
 				{
-					URLs:       []string{"turn:relay1.expressturn.com:3480"},
-					Username:   "000000002071768906",
-					Credential: "0hagJJHrDeiDO6zu7+GRqTcMTrc=",
+					URLs:       []string{fmt.Sprintf("turn:%s", cfg.TurnServer.URL)},
+					Username:   cfg.TurnServer.Username,
+					Credential: cfg.TurnServer.Password,
 				},
 			},
 		},
@@ -200,10 +209,10 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		}
 	}()
 
-	pc, audioTrack, err := createPeerConnection()
+	pc, audioTrack, err := createPeerConnection(h.cfg)
 	if err != nil {
-		slog.Error("PeerConnection error", "error", err)
-		return nil // Don't return HTTP error after upgrade
+		slog.Error("create peer connection", "error", err)
+		return nil
 	}
 
 	client := &Client{
@@ -227,9 +236,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		pc.Close()
 	}()
 
-	// WebRTC handlers (unchanged)
 	pc.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		//slog.Info("Received track", "kind", track.Kind(), "id", track.ID())
 		if track.Kind() == webrtc.RTPCodecTypeAudio {
 			go func() {
 				for {
@@ -417,8 +424,11 @@ func main() {
 		cfg: &cfg,
 		upgrader: &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				//return r.Header.Get("Origin") == "https://xxsm.ru"
-				return true
+				if cfg.Debug {
+					return true
+				}
+
+				return r.Header.Get("Origin") == cfg.Domain
 			},
 		},
 		roomManager: NewRoomManager(),
