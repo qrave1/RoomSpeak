@@ -297,6 +297,7 @@ func (h *HttpHandler) handleClientMessage(c *Client, msg []byte) error {
 		if err := json.Unmarshal(msg, &data); err != nil {
 			return err
 		}
+
 		c.name = data.Name
 
 		room := h.roomManager.GetOrCreate(data.RoomID)
@@ -374,10 +375,9 @@ func SlogLogger() echo.MiddlewareFunc {
 					c.Request().Context(),
 					level,
 					"HTTP request",
-					slog.String("method", v.Method),
-					slog.String("uri", v.URI),
 					slog.Int("status", v.Status),
-					slog.String("remote_ip", c.RealIP()),
+					slog.String("uri", v.URI),
+					slog.String("method", v.Method),
 				)
 
 				return nil
