@@ -20,9 +20,9 @@ import (
 )
 
 type Config struct {
-	Debug      bool   `env:"DEBUG" envDefault:"true"`
+	Debug      bool   `env:"DEBUG" envDefault:"false"`
 	Port       string `env:"PORT" envDefault:"3000"`
-	Domain     string `env:"DOMAIN" envDefault:"xxsm.ru"`
+	Domain     string `env:"DOMAIN" envDefault:"https://xxsm.ru"`
 	TurnServer TurnServerConfig
 }
 
@@ -419,6 +419,8 @@ func main() {
 		slog.Error("parse config", "error", err)
 		os.Exit(1)
 	}
+
+	slog.Info("Running app", slog.Any("debug", cfg.Debug))
 
 	httpHandler := &HttpHandler{
 		cfg: &cfg,
