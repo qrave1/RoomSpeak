@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -24,7 +25,8 @@ type Config struct {
 var (
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			return r.Header.Get("Origin") == "https://xxsm.ru"
+			//return r.Header.Get("Origin") == "https://xxsm.ru"
+			return true
 		},
 	}
 	roomManager = NewRoomManager()
@@ -120,7 +122,7 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
 		}
 
 		if err := client.audioTrack.WriteRTP(pkt); err != nil {
-			slog.Error("RTP write error", "error", err)
+			slog.Error("write RTP", "error", err)
 		}
 	}
 }
@@ -137,7 +139,16 @@ type Client struct {
 func createPeerConnection() (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, error) {
 	pc, err := webrtc.NewPeerConnection(
 		webrtc.Configuration{
-			ICEServers: []webrtc.ICEServer{{URLs: []string{"stun:stun.l.google.com:19302"}}},
+			ICEServers: []webrtc.ICEServer{
+				{
+					URLs: []string{"stun:stun.l.google.com:19302"},
+				},
+				{
+					URLs:       []string{"turn:relay1.expressturn.com:3480"},
+					Username:   "000000002071768906",
+					Credential: "0hagJJHrDeiDO6zu7+GRqTcMTrc=",
+				},
+			},
 		},
 	)
 	if err != nil {
@@ -148,10 +159,14 @@ func createPeerConnection() (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP
 		webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "RoomSpeak",
 	)
 	if err != nil {
+		slog.Error("create audio track error", "error", err)
+
 		return nil, nil, err
 	}
 
 	if _, err = pc.AddTrack(audioTrack); err != nil {
+		slog.Error("add audio track error", "error", err)
+
 		return nil, nil, err
 	}
 
@@ -162,14 +177,42 @@ func handleWebSocket(c echo.Context) error {
 	ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		slog.Error("WebSocket upgrade error", "error", err)
-		return c.String(http.StatusBadRequest, "upgrade error")
+		return err // Let Echo handle HTTP error
 	}
 	defer ws.Close()
+
+	err = ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+	if err != nil {
+		return err
+	}
+	ws.SetPongHandler(func(string) error {
+		slog.Info("Получен pong")
+		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
+
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := ws.WriteMessage(websocket.PingMessage, nil); err != nil {
+					slog.Error("ping failed", slog.Any("err", err))
+					return
+				}
+			case <-c.Request().Context().Done():
+				slog.Info("client context done")
+				return
+			}
+		}
+	}()
 
 	pc, audioTrack, err := createPeerConnection()
 	if err != nil {
 		slog.Error("PeerConnection error", "error", err)
-		return c.String(http.StatusBadRequest, "peer connection error")
+		return nil // Don't return HTTP error after upgrade
 	}
 
 	client := &Client{
@@ -189,60 +232,49 @@ func handleWebSocket(c echo.Context) error {
 				client.room.RemoveClient(client.id)
 			}
 		}
-
+		ws.Close()
 		pc.Close()
 	}()
 
-	pc.OnTrack(
-		func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-			if track.Kind() == webrtc.RTPCodecTypeAudio {
-				go func() {
-					for {
-						pkt, _, err := track.ReadRTP()
-						if err != nil {
-							slog.Error("RTP read error", "error", err)
-
-							return
-						}
-
-						client.room.BroadcastRTP(pkt, client.id)
+	// WebRTC handlers (unchanged)
+	pc.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+		//slog.Info("Received track", "kind", track.Kind(), "id", track.ID())
+		if track.Kind() == webrtc.RTPCodecTypeAudio {
+			go func() {
+				for {
+					pkt, _, err := track.ReadRTP()
+					if err != nil {
+						slog.Error("RTP read error", "error", err)
+						return
 					}
-				}()
-			}
-		},
-	)
+					//slog.Info("RTP packet received", "seq", pkt.SequenceNumber)
+					client.room.BroadcastRTP(pkt, client.id)
+				}
+			}()
+		}
+	})
 
-	pc.OnICECandidate(
-		func(c *webrtc.ICECandidate) {
-			if c == nil {
-				return
-			}
+	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c == nil {
+			return
+		}
+		ws.WriteJSON(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
+	})
 
-			ws.WriteJSON(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
-		},
-	)
-
-	pc.OnConnectionStateChange(
-		func(state webrtc.PeerConnectionState) {
-			switch state {
-			case webrtc.PeerConnectionStateFailed:
-				slog.Warn("PeerConnection state failed", "client_id", client.id)
-				pc.Close()
-			case webrtc.PeerConnectionStateDisconnected:
-				slog.Warn("PeerConnection state disconnected", "client_id", client.id)
-			default:
-			}
-		},
-	)
+	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		slog.Info("PeerConnection state change", "state", state.String(), "client_id", client.id)
+		if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateDisconnected {
+			slog.Error("PeerConnection bad status", "client_id", client.id, "state", state.String())
+			return
+		}
+	})
 
 	for {
 		_, msg, err := ws.ReadMessage()
 		if err != nil {
 			slog.Error("WebSocket read error", "error", err)
-
-			return c.String(http.StatusBadRequest, "read ws message error")
+			return nil // Don't return HTTP error
 		}
-
 		if err := handleClientMessage(client, msg); err != nil {
 			slog.Error("Message handling error", "error", err)
 		}
@@ -250,14 +282,19 @@ func handleWebSocket(c echo.Context) error {
 }
 
 func handleClientMessage(c *Client, msg []byte) error {
-	var base struct{ Type string }
+	var base struct {
+		Type string `json:"type"`
+	}
 	if err := json.Unmarshal(msg, &base); err != nil {
 		return err
 	}
 
 	switch base.Type {
 	case "join":
-		var data struct{ Name, RoomID string }
+		var data struct {
+			Name   string `json:"name"`
+			RoomID string `json:"room"`
+		}
 		if err := json.Unmarshal(msg, &data); err != nil {
 			return err
 		}
@@ -302,6 +339,14 @@ func handleClientMessage(c *Client, msg []byte) error {
 
 		return c.peerConn.AddICECandidate(data.Candidate)
 
+	case "ping":
+		slog.Info(
+			"pong",
+			slog.Any("client_id", c.id),
+			slog.Any("room_id", c.room.id),
+		)
+
+		return c.wsConn.WriteJSON(map[string]interface{}{"type": "pong"})
 	default:
 		return errors.New("unknown message type")
 	}
