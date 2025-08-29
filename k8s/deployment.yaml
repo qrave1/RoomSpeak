@@ -19,10 +19,15 @@ spec:
     spec:
       containers:
         - name: roomspeak-backend
-          image: ghcr.io/qrave1/roomspeak:2025_08_28_16_04_51
+          image: ghcr.io/qrave1/roomspeak:2025_08_29_14_15_04
           ports:
             - containerPort: 3000
               protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: roomspeak-configmap
+            - secretRef:
+                name: turn-secret
           resources:
             requests:
               memory: "1Mi"
