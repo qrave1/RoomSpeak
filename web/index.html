@@ -431,8 +431,7 @@
                         this.updateParticipants(message.list);
                         break;
                     case 'pong':
-                        const rtt = Date.now() - message.ts; // если сервер вернёт ts обратно
-                        console.log("Pong received, RTT:", rtt, "ms");
+                        console.log('Pong received');
                         break;
 
                     default:

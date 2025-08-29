@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
@@ -21,16 +22,6 @@ type Config struct {
 	Debug bool   `env:"DEBUG" envDefault:"true"`
 	Port  string `env:"PORT" envDefault:"3000"`
 }
-
-var (
-	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			//return r.Header.Get("Origin") == "https://xxsm.ru"
-			return true
-		},
-	}
-	roomManager = NewRoomManager()
-)
 
 type RoomManager struct {
 	rooms map[string]*Room
@@ -173,11 +164,11 @@ func createPeerConnection() (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP
 	return pc, audioTrack, nil
 }
 
-func handleWebSocket(c echo.Context) error {
-	ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+func (h *HttpHandler) handleWebSocket(c echo.Context) error {
+	ws, err := h.upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
 		slog.Error("WebSocket upgrade error", "error", err)
-		return err // Let Echo handle HTTP error
+		return err
 	}
 	defer ws.Close()
 
@@ -227,7 +218,7 @@ func handleWebSocket(c echo.Context) error {
 	defer func() {
 		if client.room != nil {
 			if len(client.room.clients) == 0 {
-				roomManager.Remove(client.room.id)
+				h.roomManager.Remove(client.room.id)
 			} else {
 				client.room.RemoveClient(client.id)
 			}
@@ -245,9 +236,10 @@ func handleWebSocket(c echo.Context) error {
 					pkt, _, err := track.ReadRTP()
 					if err != nil {
 						slog.Error("RTP read error", "error", err)
+
 						return
 					}
-					//slog.Info("RTP packet received", "seq", pkt.SequenceNumber)
+
 					client.room.BroadcastRTP(pkt, client.id)
 				}
 			}()
@@ -273,15 +265,15 @@ func handleWebSocket(c echo.Context) error {
 		_, msg, err := ws.ReadMessage()
 		if err != nil {
 			slog.Error("WebSocket read error", "error", err)
-			return nil // Don't return HTTP error
+			return nil
 		}
-		if err := handleClientMessage(client, msg); err != nil {
+		if err := h.handleClientMessage(client, msg); err != nil {
 			slog.Error("Message handling error", "error", err)
 		}
 	}
 }
 
-func handleClientMessage(c *Client, msg []byte) error {
+func (h *HttpHandler) handleClientMessage(c *Client, msg []byte) error {
 	var base struct {
 		Type string `json:"type"`
 	}
@@ -300,7 +292,7 @@ func handleClientMessage(c *Client, msg []byte) error {
 		}
 		c.name = data.Name
 
-		room := roomManager.GetOrCreate(data.RoomID)
+		room := h.roomManager.GetOrCreate(data.RoomID)
 
 		room.AddClient(c)
 
@@ -387,6 +379,24 @@ func SlogLogger() echo.MiddlewareFunc {
 	)
 }
 
+type HttpHandler struct {
+	cfg         *Config
+	upgrader    *websocket.Upgrader
+	roomManager *RoomManager
+}
+
+func NewHttpHandler(
+	cfg *Config,
+	roomManager *RoomManager,
+	upgrader *websocket.Upgrader,
+) *HttpHandler {
+	return &HttpHandler{
+		cfg:         cfg,
+		roomManager: roomManager,
+		upgrader:    upgrader,
+	}
+}
+
 func main() {
 	slog.SetDefault(
 		slog.New(
@@ -397,14 +407,31 @@ func main() {
 		),
 	)
 
+	cfg, err := env.ParseAs[Config]()
+	if err != nil {
+		slog.Error("parse config", "error", err)
+		os.Exit(1)
+	}
+
+	httpHandler := &HttpHandler{
+		cfg: &cfg,
+		upgrader: &websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				//return r.Header.Get("Origin") == "https://xxsm.ru"
+				return true
+			},
+		},
+		roomManager: NewRoomManager(),
+	}
+
 	e := echo.New()
 
 	e.Use(SlogLogger())
 
 	e.Static("/", "web")
-	e.GET("/ws", handleWebSocket)
+	e.GET("/ws", httpHandler.handleWebSocket)
 
-	err := e.Start(":3000")
+	err = e.Start(":3000")
 	if err != nil {
 		slog.Error(
 			"HTTP server failed",
