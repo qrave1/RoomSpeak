@@ -291,6 +291,15 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 				slog.String(constant.State, state.String()),
 				slog.String(constant.SessionID, session.id),
 			)
+
+			err := session.wsConn.WriteJSON(map[string]interface{}{
+				"type":    constant.Error,
+				"message": fmt.Sprintf("peer connection bad state: %s", state.String()),
+			})
+			if err != nil {
+				slog.Error("send peer connection state", slog.Any(constant.Error, err))
+				return
+			}
 			return
 		}
 	})
