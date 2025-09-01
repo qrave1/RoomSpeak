@@ -18,3 +18,13 @@ tasks:
     cmds:
       - docker push {{.REGISTRY}}:{{.BUILD_TIMESTAMP}}
       - docker push {{.REGISTRY}}:latest
+
+  deploy:
+    desc: Build, push, update deployment.yaml and apply
+    deps: [ docker-push ]
+    cmds:
+      # Подставляем новый тег в deployment.yaml (перезапись на диске)
+      - IMAGE="{{.REGISTRY}}:{{.BUILD_TIMESTAMP}}" yq eval -i '.spec.template.spec.containers[0].image = strenv(IMAGE)' k8s/deployment.yaml
+
+      # Применяем обновлённый манифест
+      - kubectl apply -f k8s/deployment.yaml
