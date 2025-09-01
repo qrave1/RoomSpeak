@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -112,7 +113,7 @@ func (r *Room) broadcastParticipants() {
 	}
 }
 
-func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
+func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string, trackType string) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -121,8 +122,15 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
 			continue
 		}
 
-		if err := client.audioTrack.WriteRTP(pkt); err != nil {
-			slog.Error("write RTP", "error", err)
+		var err error
+		if trackType == "audio" {
+			err = client.audioTrack.WriteRTP(pkt)
+		} else if trackType == "video" {
+			err = client.videoTrack.WriteRTP(pkt)
+		}
+
+		if err != nil {
+			slog.Error("write RTP", "error", err, "track_type", trackType)
 		}
 	}
 }
@@ -134,9 +142,11 @@ type Client struct {
 	peerConn   *webrtc.PeerConnection
 	room       *Room
 	audioTrack *webrtc.TrackLocalStaticRTP
+	videoTrack *webrtc.TrackLocalStaticRTP
 }
 
-func createPeerConnection(cfg *Config) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, error) {
+// TODO: refactor shit
+func createPeerConnection(cfg *Config) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, *webrtc.TrackLocalStaticRTP, error) {
 	pc, err := webrtc.NewPeerConnection(
 		webrtc.Configuration{
 			ICEServers: []webrtc.ICEServer{
@@ -152,25 +162,36 @@ func createPeerConnection(cfg *Config) (*webrtc.PeerConnection, *webrtc.TrackLoc
 		},
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	audioTrack, err := webrtc.NewTrackLocalStaticRTP(
 		webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "RoomSpeak",
 	)
 	if err != nil {
-		slog.Error("create audio track error", "error", err)
+		slog.Error("create audio track", "error", err)
+		return nil, nil, nil, err
+	}
 
-		return nil, nil, err
+	videoTrack, err := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "RoomSpeak",
+	)
+	if err != nil {
+		slog.Error("create video track", "error", err)
+		return nil, nil, nil, err
 	}
 
 	if _, err = pc.AddTrack(audioTrack); err != nil {
-		slog.Error("add audio track error", "error", err)
-
-		return nil, nil, err
+		slog.Error("add audio track", "error", err)
+		return nil, nil, nil, err
 	}
 
-	return pc, audioTrack, nil
+	if _, err = pc.AddTrack(videoTrack); err != nil {
+		slog.Error("add video track", "error", err)
+		return nil, nil, nil, err
+	}
+
+	return pc, audioTrack, videoTrack, nil
 }
 
 func (h *HttpHandler) handleWebSocket(c echo.Context) error {
@@ -209,7 +230,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		}
 	}()
 
-	pc, audioTrack, err := createPeerConnection(h.cfg)
+	pc, audioTrack, videoTrack, err := createPeerConnection(h.cfg)
 	if err != nil {
 		slog.Error("create peer connection", "error", err)
 		return nil
@@ -220,6 +241,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		wsConn:     ws,
 		peerConn:   pc,
 		audioTrack: audioTrack,
+		videoTrack: videoTrack,
 	}
 
 	slog.Info("WebSocket connection established", "client_id", client.id)
@@ -237,20 +259,24 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 	}()
 
 	pc.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		if track.Kind() == webrtc.RTPCodecTypeAudio {
-			go func() {
-				for {
-					pkt, _, err := track.ReadRTP()
-					if err != nil {
+		go func() {
+			for {
+				pkt, _, err := track.ReadRTP()
+				if err != nil {
+					if !errors.Is(err, io.EOF) {
 						slog.Error("RTP read error", "error", err)
-
-						return
 					}
 
-					client.room.BroadcastRTP(pkt, client.id)
+					return
 				}
-			}()
-		}
+
+				if track.Kind() == webrtc.RTPCodecTypeAudio {
+					client.room.BroadcastRTP(pkt, client.id, "audio")
+				} else if track.Kind() == webrtc.RTPCodecTypeVideo {
+					client.room.BroadcastRTP(pkt, client.id, "video")
+				}
+			}
+		}()
 	})
 
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
