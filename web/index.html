@@ -601,7 +601,7 @@
                         }
 
                         audio.play();
-                    } else if (event.track.kind === 'video' && this.enableVideo) {
+                    } else if (event.track.kind === 'video') {
                         // Добавляем видео поток в массив удаленных потоков
                         this.remoteStreams.push(event.streams[0]);
 
