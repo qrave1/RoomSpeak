@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: roomspeak-backend
-          image: ghcr.io/qrave1/roomspeak:2025_08_30_18_22_56
+          image: ghcr.io/qrave1/roomspeak:2025_09_01_16_31_33
           ports:
             - containerPort: 3000
               protocol: TCP
