@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -184,21 +185,21 @@ func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.T
 		return nil, nil, nil, err
 	}
 
-	videoTrack, err := webrtc.NewTrackLocalStaticRTP(
-		webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "RoomSpeak",
-	)
-	if err != nil {
+	if _, err = pc.AddTrack(audioTrack); err != nil {
 		slog.Error(
-			"create video track",
+			"add audio track",
 			slog.Any(constant.Error, err),
 		)
 
 		return nil, nil, nil, err
 	}
 
-	if _, err = pc.AddTrack(audioTrack); err != nil {
+	videoTrack, err := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "RoomSpeak",
+	)
+	if err != nil {
 		slog.Error(
-			"add audio track",
+			"create video track",
 			slog.Any(constant.Error, err),
 		)
 
@@ -233,7 +234,6 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		return err
 	}
 	ws.SetPongHandler(func(string) error {
-		slog.Info("Получен pong")
 		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
@@ -255,10 +255,6 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 					return
 				}
 			case <-c.Request().Context().Done():
-				slog.Info(
-					"session context done",
-					slog.String(constant.SessionID, session.id),
-				)
 				return
 			}
 		}
@@ -278,10 +274,10 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 				session.room.RemoveSession(session.id)
 			}
 		}
-		session.wsConn.Close()
 		session.peerConn.Close()
 	}()
 
+	// TODO: вынести все хендлеры для peerConnection в пакет signaling
 	session.peerConn.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		go func() {
 			for {
@@ -330,22 +326,38 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 	})
 
 	for {
-		_, msg, err := ws.ReadMessage()
-		if err != nil {
-			slog.Error("WebSocket read error", slog.Any(constant.Error, err))
+		select {
+		case <-c.Request().Context().Done():
 			return nil
-		}
+		default:
+			_, msg, err := session.wsConn.ReadMessage()
+			if err != nil && IsConnectionClosed(err) {
+				slog.Error(
+					"webSocket read error",
+					slog.Any(constant.Error, err),
+				)
 
-		signalMessage := new(signaling.Message)
+				return nil
+			}
 
-		if err := json.Unmarshal(msg, &signalMessage); err != nil {
-			return err
-		}
+			signalMessage := new(signaling.Message)
 
-		if err := h.handleMessage(session, signalMessage); err != nil {
-			slog.Error("handle message", slog.Any(constant.Error, err))
+			if err := json.Unmarshal(msg, &signalMessage); err != nil {
+				return err
+			}
+
+			if err := h.handleMessage(session, signalMessage); err != nil {
+				slog.Error("handle message", slog.Any(constant.Error, err))
+			}
 		}
 	}
+}
+
+// IsConnectionClosed проверяет, закрыто ли соединение
+func IsConnectionClosed(err error) bool {
+	return websocket.IsCloseError(err) ||
+		websocket.IsUnexpectedCloseError(err) ||
+		strings.Contains(err.Error(), "use of closed network connection")
 }
 
 func (h *HttpHandler) handleMessage(session *Session,
