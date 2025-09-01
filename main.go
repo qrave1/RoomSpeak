@@ -11,27 +11,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/caarlos0/env/v11"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
+	"github.com/qrave1/RoomSpeak/internal/middleware"
+	"github.com/qrave1/RoomSpeak/internal/signaling"
+
+	"github.com/qrave1/RoomSpeak/internal/config"
+	"github.com/qrave1/RoomSpeak/internal/constant"
 )
-
-type Config struct {
-	Debug      bool   `env:"DEBUG" envDefault:"false"`
-	Port       string `env:"PORT" envDefault:"3000"`
-	Domain     string `env:"DOMAIN" envDefault:"https://xxsm.ru"`
-	TurnServer TurnServerConfig
-}
-
-type TurnServerConfig struct {
-	URL      string `env:"TURN_URL,required"`
-	Username string `env:"TURN_USERNAME,required"`
-	Password string `env:"TURN_PASSWORD,required"`
-}
 
 type RoomManager struct {
 	rooms map[string]*Room
@@ -67,49 +57,58 @@ func (rm *RoomManager) Remove(roomID string) {
 }
 
 type Room struct {
-	id      string
-	clients map[string]*Client
-	mu      sync.RWMutex
+	id       string
+	sessions map[string]*Session
+	mu       sync.RWMutex
 }
 
 func NewRoom(id string) *Room {
 	return &Room{
-		id:      id,
-		clients: make(map[string]*Client),
+		id:       id,
+		sessions: make(map[string]*Session),
 	}
 }
 
-func (r *Room) AddClient(c *Client) {
-	slog.Info("Client joined room", "client_id", c.id, "client_name", c.name, "room_id", r.id)
+func (r *Room) AddSession(c *Session) {
+	slog.Info(
+		"Session joined room",
+		slog.String(constant.SessionID, c.id),
+		slog.String(constant.SessionName, c.name),
+		slog.String(constant.RoomID, r.id),
+	)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.clients[c.id] = c
+	r.sessions[c.id] = c
 
 	r.broadcastParticipants()
 }
 
-func (r *Room) RemoveClient(clientID string) {
+func (r *Room) RemoveSession(sessionID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	slog.Info("Client left room", "client_id", clientID, "room_id", r.id)
+	slog.Info(
+		"Session left room",
+		slog.String(constant.SessionID, sessionID),
+		slog.String(constant.RoomID, r.id),
+	)
 
-	delete(r.clients, clientID)
+	delete(r.sessions, sessionID)
 
 	r.broadcastParticipants()
 }
 
 func (r *Room) broadcastParticipants() {
-	parts := make([]string, 0, len(r.clients))
+	parts := make([]string, 0, len(r.sessions))
 
-	for _, client := range r.clients {
-		parts = append(parts, client.name)
+	for _, session := range r.sessions {
+		parts = append(parts, session.name)
 	}
 
-	for _, client := range r.clients {
-		client.wsConn.WriteJSON(map[string]interface{}{"type": "participants", "list": parts})
+	for _, session := range r.sessions {
+		session.wsConn.WriteJSON(map[string]interface{}{"type": "participants", "list": parts})
 	}
 }
 
@@ -117,36 +116,44 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string, trackType string) 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	for _, client := range r.clients {
-		if client.id == senderID {
+	for _, session := range r.sessions {
+		if session.id == senderID {
 			continue
 		}
 
 		var err error
 		if trackType == "audio" {
-			err = client.audioTrack.WriteRTP(pkt)
+			err = session.audioTrack.WriteRTP(pkt)
 		} else if trackType == "video" {
-			err = client.videoTrack.WriteRTP(pkt)
+			err = session.videoTrack.WriteRTP(pkt)
 		}
 
 		if err != nil {
-			slog.Error("write RTP", "error", err, "track_type", trackType)
+			slog.Error(
+				"write RTP",
+				slog.Any(constant.Error, err),
+				slog.String("track_type", trackType),
+			)
 		}
 	}
 }
 
-type Client struct {
-	id         string
-	name       string
-	wsConn     *websocket.Conn
+type Session struct {
+	id   string
+	name string
+
+	// TODO: move to roomID
+	room *Room
+
+	wsConn *websocket.Conn
+
 	peerConn   *webrtc.PeerConnection
-	room       *Room
 	audioTrack *webrtc.TrackLocalStaticRTP
 	videoTrack *webrtc.TrackLocalStaticRTP
 }
 
-// TODO: refactor shit
-func createPeerConnection(cfg *Config) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, *webrtc.TrackLocalStaticRTP, error) {
+// TODO move to peerConnectionFactory
+func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, *webrtc.TrackLocalStaticRTP, error) {
 	pc, err := webrtc.NewPeerConnection(
 		webrtc.Configuration{
 			ICEServers: []webrtc.ICEServer{
@@ -169,7 +176,11 @@ func createPeerConnection(cfg *Config) (*webrtc.PeerConnection, *webrtc.TrackLoc
 		webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "RoomSpeak",
 	)
 	if err != nil {
-		slog.Error("create audio track", "error", err)
+		slog.Error(
+			"create audio track",
+			slog.Any(constant.Error, err),
+		)
+
 		return nil, nil, nil, err
 	}
 
@@ -177,17 +188,29 @@ func createPeerConnection(cfg *Config) (*webrtc.PeerConnection, *webrtc.TrackLoc
 		webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "RoomSpeak",
 	)
 	if err != nil {
-		slog.Error("create video track", "error", err)
+		slog.Error(
+			"create video track",
+			slog.Any(constant.Error, err),
+		)
+
 		return nil, nil, nil, err
 	}
 
 	if _, err = pc.AddTrack(audioTrack); err != nil {
-		slog.Error("add audio track", "error", err)
+		slog.Error(
+			"add audio track",
+			slog.Any(constant.Error, err),
+		)
+
 		return nil, nil, nil, err
 	}
 
 	if _, err = pc.AddTrack(videoTrack); err != nil {
-		slog.Error("add video track", "error", err)
+		slog.Error(
+			"add video track",
+			slog.Any(constant.Error, err),
+		)
+
 		return nil, nil, nil, err
 	}
 
@@ -197,7 +220,10 @@ func createPeerConnection(cfg *Config) (*webrtc.PeerConnection, *webrtc.TrackLoc
 func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 	ws, err := h.upgrader.Upgrade(c.Response(), c.Request(), nil)
 	if err != nil {
-		slog.Error("WebSocket upgrade error", "error", err)
+		slog.Error(
+			"WebSocket upgrade error",
+			slog.Any(constant.Error, err),
+		)
 		return err
 	}
 	defer ws.Close()
@@ -212,6 +238,11 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		return nil
 	})
 
+	session := &Session{
+		id:     uuid.NewString(),
+		wsConn: ws,
+	}
+
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -220,45 +251,38 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 			select {
 			case <-ticker.C:
 				if err := ws.WriteMessage(websocket.PingMessage, nil); err != nil {
-					slog.Error("ping failed", slog.Any("err", err))
+					slog.Error("ping failed", slog.Any(constant.Error, err))
 					return
 				}
 			case <-c.Request().Context().Done():
-				slog.Info("client context done")
+				slog.Info(
+					"session context done",
+					slog.String(constant.SessionID, session.id),
+				)
 				return
 			}
 		}
 	}()
 
-	pc, audioTrack, videoTrack, err := createPeerConnection(h.cfg)
+	session.peerConn, session.audioTrack, session.videoTrack, err = createPeerConnection(h.cfg)
 	if err != nil {
-		slog.Error("create peer connection", "error", err)
+		slog.Error("create peer connection", slog.Any(constant.Error, err))
 		return nil
 	}
 
-	client := &Client{
-		id:         uuid.NewString(),
-		wsConn:     ws,
-		peerConn:   pc,
-		audioTrack: audioTrack,
-		videoTrack: videoTrack,
-	}
-
-	slog.Info("WebSocket connection established", "client_id", client.id)
-
 	defer func() {
-		if client.room != nil {
-			if len(client.room.clients) == 0 {
-				h.roomManager.Remove(client.room.id)
+		if session.room != nil {
+			if len(session.room.sessions) == 0 {
+				h.roomManager.Remove(session.room.id)
 			} else {
-				client.room.RemoveClient(client.id)
+				session.room.RemoveSession(session.id)
 			}
 		}
-		ws.Close()
-		pc.Close()
+		session.wsConn.Close()
+		session.peerConn.Close()
 	}()
 
-	pc.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+	session.peerConn.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		go func() {
 			for {
 				pkt, _, err := track.ReadRTP()
@@ -271,25 +295,36 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 				}
 
 				if track.Kind() == webrtc.RTPCodecTypeAudio {
-					client.room.BroadcastRTP(pkt, client.id, "audio")
+					session.room.BroadcastRTP(pkt, session.id, "audio")
 				} else if track.Kind() == webrtc.RTPCodecTypeVideo {
-					client.room.BroadcastRTP(pkt, client.id, "video")
+					session.room.BroadcastRTP(pkt, session.id, "video")
 				}
 			}
 		}()
 	})
 
-	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
+	session.peerConn.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c == nil {
 			return
 		}
-		ws.WriteJSON(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
+		session.wsConn.WriteJSON(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
 	})
 
-	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		slog.Info("PeerConnection state change", "state", state.String(), "client_id", client.id)
+	session.peerConn.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateDisconnected {
-			slog.Error("PeerConnection bad status", "client_id", client.id, "state", state.String())
+			slog.Error("PeerConnection bad status",
+				slog.String(constant.State, state.String()),
+				slog.String(constant.SessionID, session.id),
+			)
+
+			err := session.wsConn.WriteJSON(map[string]interface{}{
+				"type":    constant.Error,
+				"message": fmt.Sprintf("peer connection bad state: %s", state.String()),
+			})
+			if err != nil {
+				slog.Error("send peer connection state", slog.Any(constant.Error, err))
+				return
+			}
 			return
 		}
 	})
@@ -297,82 +332,113 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 	for {
 		_, msg, err := ws.ReadMessage()
 		if err != nil {
-			slog.Error("WebSocket read error", "error", err)
+			slog.Error("WebSocket read error", slog.Any(constant.Error, err))
 			return nil
 		}
-		if err := h.handleClientMessage(client, msg); err != nil {
-			slog.Error("Message handling error", "error", err)
+
+		signalMessage := new(signaling.Message)
+
+		if err := json.Unmarshal(msg, &signalMessage); err != nil {
+			return err
+		}
+
+		if err := h.handleMessage(session, signalMessage); err != nil {
+			slog.Error("handle message", slog.Any(constant.Error, err))
 		}
 	}
 }
 
-func (h *HttpHandler) handleClientMessage(c *Client, msg []byte) error {
-	var base struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(msg, &base); err != nil {
-		return err
-	}
-
-	switch base.Type {
+func (h *HttpHandler) handleMessage(session *Session,
+	msg *signaling.Message) error {
+	switch msg.Type {
 	case "join":
-		var data struct {
-			Name   string `json:"name"`
-			RoomID string `json:"room"`
-		}
-		if err := json.Unmarshal(msg, &data); err != nil {
+		var joinEvent signaling.JoinEvent
+
+		if err := json.Unmarshal(msg.Data, &joinEvent); err != nil {
 			return err
 		}
 
-		c.name = data.Name
+		if joinEvent.Name == "" {
+			joinEvent.Name = "Anonymous"
+		}
 
-		room := h.roomManager.GetOrCreate(data.RoomID)
+		if joinEvent.RoomID == "" {
+			session.wsConn.WriteJSON(map[string]interface{}{"type": constant.Error, "message": "room_id is required"})
+			return errors.New("room_id is required")
+		}
 
-		room.AddClient(c)
+		session.name = joinEvent.Name
 
-		c.room = room
+		room := h.roomManager.GetOrCreate(joinEvent.RoomID)
+
+		room.AddSession(session)
+
+		session.room = room
 
 	case "offer":
-		var data struct{ SDP string }
-		if err := json.Unmarshal(msg, &data); err != nil {
+		var offer signaling.SdpEvent
+
+		if err := json.Unmarshal(msg.Data, &offer); err != nil {
 			return err
 		}
 
-		if err := c.peerConn.SetRemoteDescription(
+		if err := session.peerConn.SetRemoteDescription(
 			webrtc.SessionDescription{
-				Type: webrtc.SDPTypeOffer, SDP: data.SDP,
+				Type: webrtc.SDPTypeOffer,
+				SDP:  offer.SDP,
 			},
 		); err != nil {
 			return err
 		}
 
-		answer, err := c.peerConn.CreateAnswer(nil)
+		answer, err := session.peerConn.CreateAnswer(nil)
 		if err != nil {
 			return err
 		}
 
-		if err = c.peerConn.SetLocalDescription(answer); err != nil {
+		if err = session.peerConn.SetLocalDescription(answer); err != nil {
+			slog.Error("set local description", slog.Any(constant.Error, err))
+
 			return err
 		}
 
-		return c.wsConn.WriteJSON(map[string]interface{}{"type": "answer", "sdp": answer.SDP})
+		return session.wsConn.WriteJSON(map[string]interface{}{"type": "answer", "sdp": answer.SDP})
+
+	case "answer":
+		var answer signaling.SdpEvent
+
+		if err := json.Unmarshal(msg.Data, &answer); err != nil {
+			return err
+		}
+
+		if err := session.peerConn.SetRemoteDescription(
+			webrtc.SessionDescription{
+				Type: webrtc.SDPTypeAnswer,
+				SDP:  answer.SDP,
+			},
+		); err != nil {
+			slog.Error("set remote description", slog.Any(constant.Error, err))
+
+			return err
+		}
 
 	case "candidate":
-		var data struct{ Candidate webrtc.ICECandidateInit }
-		if err := json.Unmarshal(msg, &data); err != nil {
+		var candidate signaling.CandidateEvent
+
+		if err := json.Unmarshal(msg.Data, &candidate); err != nil {
 			return err
 		}
 
-		return c.peerConn.AddICECandidate(data.Candidate)
+		return session.peerConn.AddICECandidate(candidate.Candidate)
 
 	case "ping":
 		slog.Info(
 			"pong",
-			slog.Any("client_id", c.id),
-			slog.Any("room_id", c.room.id),
+			slog.Any(constant.SessionID, session.id),
+			slog.Any(constant.RoomID, session.room.id),
 		)
 
-		return c.wsConn.WriteJSON(map[string]interface{}{"type": "pong"})
+		return session.wsConn.WriteJSON(map[string]interface{}{"type": "pong"})
 	default:
 		return errors.New("unknown message type")
 	}
@@ -380,46 +446,14 @@ func (h *HttpHandler) handleClientMessage(c *Client, msg []byte) error {
 	return nil
 }
 
-// Кастомный логгер через slog
-func SlogLogger() echo.MiddlewareFunc {
-	return middleware.RequestLoggerWithConfig(
-		middleware.RequestLoggerConfig{
-			LogStatus: true,
-			LogURI:    true,
-			LogMethod: true,
-			LogError:  true,
-
-			LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-				level := slog.LevelInfo
-				if v.Error != nil || v.Status >= http.StatusInternalServerError {
-					level = slog.LevelError
-				} else if v.Status >= http.StatusBadRequest {
-					level = slog.LevelWarn
-				}
-
-				slog.LogAttrs(
-					c.Request().Context(),
-					level,
-					"HTTP request",
-					slog.Int("status", v.Status),
-					slog.String("uri", v.URI),
-					slog.String("method", v.Method),
-				)
-
-				return nil
-			},
-		},
-	)
-}
-
 type HttpHandler struct {
-	cfg         *Config
+	cfg         *config.Config
 	upgrader    *websocket.Upgrader
 	roomManager *RoomManager
 }
 
 func NewHttpHandler(
-	cfg *Config,
+	cfg *config.Config,
 	roomManager *RoomManager,
 	upgrader *websocket.Upgrader,
 ) *HttpHandler {
@@ -440,17 +474,18 @@ func main() {
 		),
 	)
 
-	cfg, err := env.ParseAs[Config]()
+	cfg, err := config.New()
 	if err != nil {
-		slog.Error("parse config", "error", err)
+		slog.Error("parse config", slog.Any(constant.Error, err))
 		os.Exit(1)
 	}
 
-	slog.Info("Running app", slog.Any("debug", cfg.Debug))
+	slog.Info("Running app", slog.Bool("debug", cfg.Debug))
 
-	httpHandler := &HttpHandler{
-		cfg: &cfg,
-		upgrader: &websocket.Upgrader{
+	httpHandler := NewHttpHandler(
+		cfg,
+		NewRoomManager(),
+		&websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				if cfg.Debug {
 					return true
@@ -459,12 +494,11 @@ func main() {
 				return r.Header.Get("Origin") == cfg.Domain
 			},
 		},
-		roomManager: NewRoomManager(),
-	}
+	)
 
 	e := echo.New()
 
-	e.Use(SlogLogger())
+	e.Use(middleware.SlogLogger())
 
 	e.Static("/", "web")
 	e.GET("/ws", httpHandler.handleWebSocket)
@@ -473,7 +507,7 @@ func main() {
 	if err != nil {
 		slog.Error(
 			"HTTP server failed",
-			slog.Any("error", err),
+			slog.Any(constant.Error, err),
 		)
 
 		os.Exit(1)
