@@ -161,11 +161,11 @@ func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.T
 				{
 					URLs: []string{"stun:stun.l.google.com:19302"},
 				},
-				{
-					URLs:       []string{fmt.Sprintf("turn:%s", cfg.TurnServer.URL)},
-					Username:   cfg.TurnServer.Username,
-					Credential: cfg.TurnServer.Password,
-				},
+				//{
+				//	URLs:       []string{fmt.Sprintf("turn:%s", cfg.CoturnConfig.Host)},
+				//	Username:   cfg.CoturnConfig.Username,
+				//	Credential: cfg.CoturnConfig.Password,
+				//},
 			},
 		},
 	)
@@ -263,6 +263,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 	session.peerConn, session.audioTrack, session.videoTrack, err = createPeerConnection(h.cfg)
 	if err != nil {
 		slog.Error("create peer connection", slog.Any(constant.Error, err))
+
 		return nil
 	}
 
@@ -514,6 +515,8 @@ func main() {
 
 	e.Static("/", "web")
 	e.GET("/ws", httpHandler.handleWebSocket)
+
+	//e.GET("/turn/credentials", httpHandler.turnCredentialsHandler)
 
 	err = e.Start(":3000")
 	if err != nil {
