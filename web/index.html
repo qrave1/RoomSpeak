@@ -537,16 +537,20 @@
             },
 
             async initializeWebRTC() {
+                const iceReq = await fetch('/ice')
+                const iceServersResponse = await iceReq.json()
+
+                const iceServers = [
+                    {urls: 'stun:stun.l.google.com:19302'},
+                    {
+                        urls: iceServersResponse.urls,
+                        username: iceServersResponse.username,
+                        credential: iceServersResponse.credential,
+                    }
+                ]
+
                 this.pc = new RTCPeerConnection({
-                    // TODO: add temp turn creds
-                    iceServers: [
-                        {urls: 'stun:stun.l.google.com:19302'},
-                        {
-                            urls: "turn:global.relay.metered.ca:80",
-                            username: "faaedb0c03ab57b3f89db765",
-                            credential: "oIWUwz8UMiKfeC5Z",
-                        }
-                    ]
+                    iceServers: iceServers
                 });
 
                 // Настройка обработчиков WebRTC

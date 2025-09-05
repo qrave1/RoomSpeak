@@ -20,7 +20,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
-	"github.com/qrave1/RoomSpeak/internal/dto"
 	"github.com/qrave1/RoomSpeak/internal/middleware"
 	"github.com/qrave1/RoomSpeak/internal/signaling"
 
@@ -460,8 +459,8 @@ func (h *HttpHandler) handleMessage(session *Session,
 	return nil
 }
 
-// Handler для выдачи TURN-кредитов
-func (h *HttpHandler) turnCredentialsHandler(c echo.Context) error {
+// Handler для выдачи ICE серверов
+func (h *HttpHandler) iceServersHandler(c echo.Context) error {
 	expiration := time.Now().Add(time.Hour).Unix()
 	username := fmt.Sprintf("%d", expiration)
 
@@ -470,14 +469,13 @@ func (h *HttpHandler) turnCredentialsHandler(c echo.Context) error {
 	mac.Write([]byte(username))
 	password := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
-	response := dto.TurnCredentialsResponse{
+	response := webrtc.ICEServer{
 		URLs: []string{
 			h.cfg.TurnUDPServer.URLs[0],
 			h.cfg.TurnTCPServer.URLs[0],
 		},
-		Username: username,
-		Password: password,
-		TTL:      3600,
+		Username:   username,
+		Credential: password,
 	}
 
 	return c.JSON(http.StatusOK, response)
@@ -540,7 +538,7 @@ func main() {
 	e.Static("/", "web")
 	e.GET("/ws", httpHandler.handleWebSocket)
 
-	e.GET("/turn/credentials", httpHandler.turnCredentialsHandler)
+	e.GET("/ice", httpHandler.iceServersHandler)
 
 	err = e.Start(":3000")
 	if err != nil {
