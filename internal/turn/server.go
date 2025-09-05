@@ -62,30 +62,3 @@ package turn
 //
 //	return server, nil
 //}
-
-// Handler для выдачи TURN-кредитов
-//func (h *HttpHandler) turnCredentialsHandler(c echo.Context) error {
-//	expiration := time.Now().Add(5 * time.Minute).Unix()
-//	username := fmt.Sprintf("%d", expiration)
-//	password := turn.GenerateAuthKey(username, h.cfg.TurnServer.Realm, h.cfg.TurnServer.Password)
-//
-//	resp := map[string]interface{}{
-//		"username": username,
-//		"password": password,
-//		"ttl":      300, // 5 минут
-//		"urls": []string{
-//			fmt.Sprintf(
-//				"turn:%s:%d?transport=udp",
-//				h.cfg.TurnServer.Host,
-//				h.cfg.TurnServer.Port,
-//			),
-//			fmt.Sprintf(
-//				"turn:%s:%d?transport=tcp",
-//				h.cfg.TurnServer.Host,
-//				h.cfg.TurnServer.Port,
-//			),
-//		},
-//	}
-//
-//	return c.JSON(http.StatusOK, resp)
-//}

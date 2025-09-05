@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +20,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
+	"github.com/qrave1/RoomSpeak/internal/dto"
 	"github.com/qrave1/RoomSpeak/internal/middleware"
 	"github.com/qrave1/RoomSpeak/internal/signaling"
 
@@ -161,11 +165,8 @@ func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.T
 				{
 					URLs: []string{"stun:stun.l.google.com:19302"},
 				},
-				//{
-				//	URLs:       []string{fmt.Sprintf("turn:%s", cfg.CoturnConfig.Host)},
-				//	Username:   cfg.CoturnConfig.Username,
-				//	Credential: cfg.CoturnConfig.Password,
-				//},
+				cfg.TurnUDPServer,
+				cfg.TurnTCPServer,
 			},
 		},
 	)
@@ -459,6 +460,29 @@ func (h *HttpHandler) handleMessage(session *Session,
 	return nil
 }
 
+// Handler для выдачи TURN-кредитов
+func (h *HttpHandler) turnCredentialsHandler(c echo.Context) error {
+	expiration := time.Now().Add(time.Hour).Unix()
+	username := fmt.Sprintf("%d", expiration)
+
+	// Создаём HMAC-SHA1 с использованием static-auth-secret
+	mac := hmac.New(sha1.New, []byte(h.cfg.CoturnServer.Secret))
+	mac.Write([]byte(username))
+	password := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+	response := dto.TurnCredentialsResponse{
+		URLs: []string{
+			h.cfg.TurnUDPServer.URLs[0],
+			h.cfg.TurnTCPServer.URLs[0],
+		},
+		Username: username,
+		Password: password,
+		TTL:      3600,
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
 type HttpHandler struct {
 	cfg         *config.Config
 	upgrader    *websocket.Upgrader
@@ -516,7 +540,7 @@ func main() {
 	e.Static("/", "web")
 	e.GET("/ws", httpHandler.handleWebSocket)
 
-	//e.GET("/turn/credentials", httpHandler.turnCredentialsHandler)
+	e.GET("/turn/credentials", httpHandler.turnCredentialsHandler)
 
 	err = e.Start(":3000")
 	if err != nil {
