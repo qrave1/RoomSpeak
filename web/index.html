@@ -160,48 +160,6 @@
             padding: 10px;
         }
 
-        /* Стили для видео */
-        .video-container {
-            background-color: #2f3136;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #202225;
-            margin-bottom: 20px;
-        }
-
-        .video-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-
-        .video-item {
-            position: relative;
-            background-color: #40444b;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .video-item video {
-            width: 100%;
-            height: 150px;
-            object-fit: cover;
-            background-color: #2f3136;
-        }
-
-        .video-label {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: #ffffff;
-            padding: 5px 10px;
-            font-size: 12px;
-            text-align: center;
-        }
-
         /* Стили для чекбокса */
         input[type="checkbox"] {
             width: auto;
@@ -232,29 +190,12 @@
             >
         </label>
 
-        <!-- Чекбокс для включения видео -->
-        <label style="display: flex; align-items: center; margin-bottom: 15px;">
-            <input type="checkbox" x-model="enableVideo" @change="onVideoToggle()"
-                   style="margin-right: 10px; width: auto;">
-            <span>Enable Video</span>
-        </label>
-
         <!-- Выбор устройства ввода -->
         <label>
             Audio Input:
             <select x-model="selectedInputDevice" @change="updateAudioDevices()">
                 <template x-for="device in audioInputDevices">
                     <option :value="device.deviceId" x-text="device.label || 'Default Microphone'"></option>
-                </template>
-            </select>
-        </label>
-
-        <!-- Выбор видео устройства -->
-        <label x-show="enableVideo">
-            Video Input:
-            <select x-model="selectedVideoDevice" @change="updateVideoDevices()">
-                <template x-for="device in videoInputDevices">
-                    <option :value="device.deviceId" x-text="device.label || 'Default Camera'"></option>
                 </template>
             </select>
         </label>
@@ -275,25 +216,6 @@
 
 <div class="room">
     <div x-show="pc">
-        <!-- Видео участников -->
-        <div class="video-container" x-show="enableVideo">
-            <h3>Video Streams</h3>
-            <div class="video-grid">
-                <!-- Локальное видео -->
-                <div class="video-item">
-                    <video x-ref="localVideo" autoplay muted playsinline></video>
-                    <div class="video-label">You</div>
-                </div>
-                <!-- Удаленные видео -->
-                <template x-for="(stream, index) in remoteStreams" :key="index">
-                    <div class="video-item">
-                        <video :ref="`remoteVideo${index}`" autoplay playsinline></video>
-                        <div class="video-label" x-text="`Participant ${index + 1}`"></div>
-                    </div>
-                </template>
-            </div>
-        </div>
-
         <h3>Participants</h3>
         <ul>
             <template x-for="participant in participants">
@@ -310,14 +232,11 @@
         return {
             name: '',
             roomCode: '',
-            enableVideo: false,
 
             audioInputDevices: [],
             audioOutputDevices: [],
-            videoInputDevices: [],
             selectedInputDevice: '',
             selectedOutputDevice: '',
-            selectedVideoDevice: '',
             currentAudioElement: null,
 
             ws: null,
@@ -325,7 +244,6 @@
 
             pc: null,
             localStream: null,
-            remoteStreams: [],
             participants: [],
 
             isFormValid() {
@@ -340,9 +258,9 @@
             },
 
             async getAudioDevices() {
-                // Получаем разрешение на доступ к микрофону и камере (требуется для получения меток устройств)
+                // Получаем разрешение на доступ к микрофону (требуется для получения меток устройств)
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true});
+                    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
                     stream.getTracks().forEach(track => track.stop());
                 } catch (err) {
                     console.error('Error getting permissions:', err);
@@ -353,7 +271,6 @@
 
                 this.audioInputDevices = devices.filter(d => d.kind === 'audioinput');
                 this.audioOutputDevices = devices.filter(d => d.kind === 'audiooutput');
-                this.videoInputDevices = devices.filter(d => d.kind === 'videoinput');
 
                 if (this.audioInputDevices.length > 0 && !this.selectedInputDevice) {
                     this.selectedInputDevice = this.audioInputDevices[0].deviceId;
@@ -361,10 +278,6 @@
 
                 if (this.audioOutputDevices.length > 0 && !this.selectedOutputDevice) {
                     this.selectedOutputDevice = this.audioOutputDevices[0].deviceId;
-                }
-
-                if (this.videoInputDevices.length > 0 && !this.selectedVideoDevice) {
-                    this.selectedVideoDevice = this.videoInputDevices[0].deviceId;
                 }
             },
 
@@ -385,99 +298,6 @@
                     const sender = this.pc.getSenders().find(s => s.track.kind === 'audio');
                     if (sender) {
                         sender.replaceTrack(this.localStream.getAudioTracks()[0]);
-                    }
-                }
-            },
-
-            async updateVideoDevices() {
-                if (this.localStream) {
-                    const videoTrack = this.localStream.getVideoTracks()[0];
-                    if (videoTrack) {
-                        videoTrack.stop();
-                    }
-                }
-
-                if (this.enableVideo) {
-                    const constraints = {
-                        video: {
-                            deviceId: this.selectedVideoDevice ? {exact: this.selectedVideoDevice} : undefined
-                        }
-                    };
-
-                    const videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    const newVideoTrack = videoStream.getVideoTracks()[0];
-
-                    if (this.localStream) {
-                        this.localStream.addTrack(newVideoTrack);
-                    }
-
-                    if (this.pc) {
-                        const sender = this.pc.getSenders().find(s => s.track.kind === 'video');
-                        if (sender) {
-                            sender.replaceTrack(newVideoTrack);
-                        }
-                    }
-
-                    // Обновляем локальное видео
-                    if (this.$refs.localVideo) {
-                        this.$refs.localVideo.srcObject = this.localStream;
-                    }
-                }
-            },
-
-            async onVideoToggle() {
-                if (this.enableVideo) {
-                    // Включаем видео
-                    if (this.localStream && this.pc) {
-                        const constraints = {
-                            video: {
-                                deviceId: this.selectedVideoDevice ? {exact: this.selectedVideoDevice} : undefined
-                            }
-                        };
-
-                        try {
-                            const videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-                            const videoTrack = videoStream.getVideoTracks()[0];
-
-                            this.localStream.addTrack(videoTrack);
-
-                            // Добавляем видео трек в peer connection
-                            const sender = this.pc.getSenders().find(s => s.track.kind === 'video');
-                            if (sender) {
-                                sender.replaceTrack(videoTrack);
-                            } else {
-                                this.pc.addTrack(videoTrack, this.localStream);
-                            }
-
-                            // Показываем локальное видео
-                            if (this.$refs.localVideo) {
-                                this.$refs.localVideo.srcObject = this.localStream;
-                            }
-                        } catch (err) {
-                            console.error('Error enabling video:', err);
-                            this.enableVideo = false;
-                        }
-                    }
-                } else {
-                    // Отключаем видео
-                    if (this.localStream) {
-                        const videoTrack = this.localStream.getVideoTracks()[0];
-                        if (videoTrack) {
-                            videoTrack.stop();
-                            this.localStream.removeTrack(videoTrack);
-                        }
-                    }
-
-                    if (this.pc) {
-                        const sender = this.pc.getSenders().find(s => s.track.kind === 'video');
-                        if (sender) {
-                            this.pc.removeTrack(sender);
-                        }
-                    }
-
-                    // Скрываем локальное видео
-                    if (this.$refs.localVideo) {
-                        this.$refs.localVideo.srcObject = null;
                     }
                 }
             },
@@ -572,13 +392,6 @@
                     }
                 };
 
-                // Добавляем видео если включено
-                if (this.enableVideo) {
-                    constraints.video = {
-                        deviceId: this.selectedVideoDevice ? {exact: this.selectedVideoDevice} : undefined
-                    };
-                }
-
                 // Получение медиа потока
                 this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
 
@@ -586,11 +399,6 @@
                 this.localStream.getTracks().forEach(track => {
                     this.pc.addTrack(track, this.localStream);
                 });
-
-                // Показываем локальное видео если включено
-                if (this.enableVideo && this.$refs.localVideo) {
-                    this.$refs.localVideo.srcObject = this.localStream;
-                }
 
                 // Обработка входящих треков
                 this.pc.ontrack = (event) => {
@@ -605,18 +413,6 @@
                         }
 
                         audio.play();
-                    } else if (event.track.kind === 'video') {
-                        // Добавляем видео поток в массив удаленных потоков
-                        this.remoteStreams.push(event.streams[0]);
-
-                        // Обновляем DOM для отображения видео
-                        this.$nextTick(() => {
-                            const videoIndex = this.remoteStreams.length - 1;
-                            const videoElement = this.$refs[`remoteVideo${videoIndex}`];
-                            if (videoElement) {
-                                videoElement.srcObject = event.streams[0];
-                            }
-                        });
                     }
                 };
 
@@ -692,17 +488,6 @@
                 if (this.localStream) {
                     this.localStream.getTracks().forEach(track => track.stop());
                     this.localStream = null;
-                }
-
-                // Очищаем удаленные видео потоки
-                this.remoteStreams.forEach(stream => {
-                    stream.getTracks().forEach(track => track.stop());
-                });
-                this.remoteStreams = [];
-
-                // Очищаем видео элементы
-                if (this.$refs.localVideo) {
-                    this.$refs.localVideo.srcObject = null;
                 }
             }
         }
