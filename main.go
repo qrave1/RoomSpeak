@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -160,11 +164,8 @@ func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.T
 				{
 					URLs: []string{"stun:stun.l.google.com:19302"},
 				},
-				{
-					URLs:       []string{fmt.Sprintf("turn:%s", cfg.TurnServer.URL)},
-					Username:   cfg.TurnServer.Username,
-					Credential: cfg.TurnServer.Password,
-				},
+				cfg.TurnUDPServer,
+				cfg.TurnTCPServer,
 			},
 		},
 	)
@@ -184,21 +185,21 @@ func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.T
 		return nil, nil, nil, err
 	}
 
-	videoTrack, err := webrtc.NewTrackLocalStaticRTP(
-		webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "RoomSpeak",
-	)
-	if err != nil {
+	if _, err = pc.AddTrack(audioTrack); err != nil {
 		slog.Error(
-			"create video track",
+			"add audio track",
 			slog.Any(constant.Error, err),
 		)
 
 		return nil, nil, nil, err
 	}
 
-	if _, err = pc.AddTrack(audioTrack); err != nil {
+	videoTrack, err := webrtc.NewTrackLocalStaticRTP(
+		webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "RoomSpeak",
+	)
+	if err != nil {
 		slog.Error(
-			"add audio track",
+			"create video track",
 			slog.Any(constant.Error, err),
 		)
 
@@ -233,7 +234,6 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		return err
 	}
 	ws.SetPongHandler(func(string) error {
-		slog.Info("Получен pong")
 		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 		return nil
 	})
@@ -255,10 +255,6 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 					return
 				}
 			case <-c.Request().Context().Done():
-				slog.Info(
-					"session context done",
-					slog.String(constant.SessionID, session.id),
-				)
 				return
 			}
 		}
@@ -267,6 +263,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 	session.peerConn, session.audioTrack, session.videoTrack, err = createPeerConnection(h.cfg)
 	if err != nil {
 		slog.Error("create peer connection", slog.Any(constant.Error, err))
+
 		return nil
 	}
 
@@ -278,10 +275,10 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 				session.room.RemoveSession(session.id)
 			}
 		}
-		session.wsConn.Close()
 		session.peerConn.Close()
 	}()
 
+	// TODO: вынести все хендлеры для peerConnection в пакет signaling
 	session.peerConn.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		go func() {
 			for {
@@ -330,22 +327,38 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 	})
 
 	for {
-		_, msg, err := ws.ReadMessage()
-		if err != nil {
-			slog.Error("WebSocket read error", slog.Any(constant.Error, err))
+		select {
+		case <-c.Request().Context().Done():
 			return nil
-		}
+		default:
+			_, msg, err := session.wsConn.ReadMessage()
+			if err != nil && IsConnectionClosed(err) {
+				slog.Error(
+					"webSocket read error",
+					slog.Any(constant.Error, err),
+				)
 
-		signalMessage := new(signaling.Message)
+				return nil
+			}
 
-		if err := json.Unmarshal(msg, &signalMessage); err != nil {
-			return err
-		}
+			signalMessage := new(signaling.Message)
 
-		if err := h.handleMessage(session, signalMessage); err != nil {
-			slog.Error("handle message", slog.Any(constant.Error, err))
+			if err := json.Unmarshal(msg, &signalMessage); err != nil {
+				return err
+			}
+
+			if err := h.handleMessage(session, signalMessage); err != nil {
+				slog.Error("handle message", slog.Any(constant.Error, err))
+			}
 		}
 	}
+}
+
+// IsConnectionClosed проверяет, закрыто ли соединение
+func IsConnectionClosed(err error) bool {
+	return websocket.IsCloseError(err) ||
+		websocket.IsUnexpectedCloseError(err) ||
+		strings.Contains(err.Error(), "use of closed network connection")
 }
 
 func (h *HttpHandler) handleMessage(session *Session,
@@ -446,6 +459,28 @@ func (h *HttpHandler) handleMessage(session *Session,
 	return nil
 }
 
+// Handler для выдачи ICE серверов
+func (h *HttpHandler) iceServersHandler(c echo.Context) error {
+	expiration := time.Now().Add(time.Hour).Unix()
+	username := fmt.Sprintf("%d", expiration)
+
+	// Создаём HMAC-SHA1 с использованием static-auth-secret
+	mac := hmac.New(sha1.New, []byte(h.cfg.CoturnServer.Secret))
+	mac.Write([]byte(username))
+	password := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+	response := webrtc.ICEServer{
+		URLs: []string{
+			h.cfg.TurnUDPServer.URLs[0],
+			h.cfg.TurnTCPServer.URLs[0],
+		},
+		Username:   username,
+		Credential: password,
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
 type HttpHandler struct {
 	cfg         *config.Config
 	upgrader    *websocket.Upgrader
@@ -502,6 +537,8 @@ func main() {
 
 	e.Static("/", "web")
 	e.GET("/ws", httpHandler.handleWebSocket)
+
+	e.GET("/ice", httpHandler.iceServersHandler)
 
 	err = e.Start(":3000")
 	if err != nil {

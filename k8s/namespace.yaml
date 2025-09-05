@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: roomspeak-prod
-  labels:
-    name: roomspeak-prod
-    environment: production

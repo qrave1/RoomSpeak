@@ -6,15 +6,21 @@ vars:
     sh: date +%Y_%m_%d_%H_%M_%S
 
 tasks:
-  docker-build:
+  build:
     desc: Build Docker image with timestamp tag
     cmds:
       - docker build -t {{.REGISTRY}}:{{.BUILD_TIMESTAMP}} .
       - docker tag {{.REGISTRY}}:{{.BUILD_TIMESTAMP}} {{.REGISTRY}}:latest
 
-  docker-push:
+  push:
     desc: Build and push Docker image to registry
-    deps: [ docker-build ]
+    deps: [ build ]
     cmds:
       - docker push {{.REGISTRY}}:{{.BUILD_TIMESTAMP}}
       - docker push {{.REGISTRY}}:latest
+
+  deploy:
+    desc: Build, push, update deployment.yaml and apply
+    deps: [ push ]
+    cmds:
+

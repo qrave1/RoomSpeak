@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  namespace: roomspeak-prod
-  name: roomspeak-configmap
-data:
-  DEBUG: "false"
-
-
