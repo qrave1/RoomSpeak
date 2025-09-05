@@ -116,7 +116,7 @@ func (r *Room) broadcastParticipants() {
 	}
 }
 
-func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string, trackType string) {
+func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -125,18 +125,12 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string, trackType string) 
 			continue
 		}
 
-		var err error
-		if trackType == "audio" {
-			err = session.audioTrack.WriteRTP(pkt)
-		} else if trackType == "video" {
-			err = session.videoTrack.WriteRTP(pkt)
-		}
+		err := session.audioTrack.WriteRTP(pkt)
 
 		if err != nil {
 			slog.Error(
 				"write RTP",
 				slog.Any(constant.Error, err),
-				slog.String("track_type", trackType),
 			)
 		}
 	}
@@ -153,11 +147,10 @@ type Session struct {
 
 	peerConn   *webrtc.PeerConnection
 	audioTrack *webrtc.TrackLocalStaticRTP
-	videoTrack *webrtc.TrackLocalStaticRTP
 }
 
 // TODO move to peerConnectionFactory
-func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, *webrtc.TrackLocalStaticRTP, error) {
+func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, error) {
 	pc, err := webrtc.NewPeerConnection(
 		webrtc.Configuration{
 			ICEServers: []webrtc.ICEServer{
@@ -170,7 +163,7 @@ func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.T
 		},
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	audioTrack, err := webrtc.NewTrackLocalStaticRTP(
@@ -182,7 +175,7 @@ func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.T
 			slog.Any(constant.Error, err),
 		)
 
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	if _, err = pc.AddTrack(audioTrack); err != nil {
@@ -191,31 +184,10 @@ func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.T
 			slog.Any(constant.Error, err),
 		)
 
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	videoTrack, err := webrtc.NewTrackLocalStaticRTP(
-		webrtc.RTPCodecCapability{MimeType: "video/vp8"}, "video", "RoomSpeak",
-	)
-	if err != nil {
-		slog.Error(
-			"create video track",
-			slog.Any(constant.Error, err),
-		)
-
-		return nil, nil, nil, err
-	}
-
-	if _, err = pc.AddTrack(videoTrack); err != nil {
-		slog.Error(
-			"add video track",
-			slog.Any(constant.Error, err),
-		)
-
-		return nil, nil, nil, err
-	}
-
-	return pc, audioTrack, videoTrack, nil
+	return pc, audioTrack, nil
 }
 
 func (h *HttpHandler) handleWebSocket(c echo.Context) error {
@@ -260,7 +232,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		}
 	}()
 
-	session.peerConn, session.audioTrack, session.videoTrack, err = createPeerConnection(h.cfg)
+	session.peerConn, session.audioTrack, err = createPeerConnection(h.cfg)
 	if err != nil {
 		slog.Error("create peer connection", slog.Any(constant.Error, err))
 
@@ -292,9 +264,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 				}
 
 				if track.Kind() == webrtc.RTPCodecTypeAudio {
-					session.room.BroadcastRTP(pkt, session.id, "audio")
-				} else if track.Kind() == webrtc.RTPCodecTypeVideo {
-					session.room.BroadcastRTP(pkt, session.id, "video")
+					session.room.BroadcastRTP(pkt, session.id)
 				}
 			}
 		}()
