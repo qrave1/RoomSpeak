@@ -1,18 +1,53 @@
+networks:
+  traefik:
+    driver: bridge
+
 services:
+  traefik:
+    image: traefik:v3.5.1
+    container_name: traefik
+    restart: always
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - traefik
+    volumes:
+      - ./traefik.yml:/etc/traefik/traefik.yml
+      - ./dynamic.yml:/etc/traefik/dynamic.yml
+      - ./acme.json:/acme.json
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      # Дашборд Traefik с BasicAuth
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.xxsm.ru`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=web"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.middlewares=auth-dashboard@file"
+
   roomspeak:
     image: ghcr.io/qrave1/roomspeak:2025_09_04_18_35_36
     container_name: roomspeak-backend
-    restart: unless-stopped
-
-    # labels для traefik
+    restart: always
+    env_file: .env
+    networks:
+      - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.app.rule=Host(`app.example.com`)"
+      - "traefik.http.routers.app.rule=Host(`xxsm.ru`)"
       - "traefik.http.routers.app.entrypoints=websecure"
       - "traefik.http.routers.app.tls.certresolver=myresolver"
+      - "traefik.http.services.app.loadbalancer.server.port=3000"
 
+  coturn:
+    image: coturn/coturn:4.7-alpine
+    container_name: coturn
+    restart: unless-stopped
     ports:
-      - "3000:3000"
-    networks:
-      - default
-    env_file: .env
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49160-49220:49160-49220/udp"
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf
