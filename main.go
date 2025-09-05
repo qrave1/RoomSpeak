@@ -131,6 +131,7 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
 			slog.Error(
 				"write RTP",
 				slog.Any(constant.Error, err),
+				slog.Any(constant.SessionID, senderID),
 			)
 		}
 	}

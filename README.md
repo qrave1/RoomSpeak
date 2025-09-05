@@ -5,15 +5,16 @@
 ### Tech List
 
 - [ ] Github CI/CD
-- [ ] TURN servers API
+- [ ] Grafana
+- [x] TURN servers API
 
 ### Features List
 
 - [x] Basic WebRTC Voice Chat
+- [x] Frontend UI/UX Redesign
 - [ ] User Authentication + RBAC
 - [ ] Room Creation and Management
 - [ ] Voice activity detection via WebRTC Data Channels
-- [ ] Frontend UI/UX Redesign
 - [ ] Room messaging via WebRTC Data Channels
 
 ## Docker
