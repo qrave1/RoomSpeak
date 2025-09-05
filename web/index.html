@@ -2,510 +2,66 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RoomSpeak</title>
 
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
-    <style>
-        /* Основные стили */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #36393f;
-            color: #ffffff;
-            margin: 0;
-            padding: 20px;
-        }
-
-        /* Стили для формы */
-        .connect_form {
-            background-color: #2f3136;
-            padding: 40px;
-            border-radius: 20px;
-            border: 1px solid #202225;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 15px;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #202225;
-            border-radius: 4px;
-            background-color: #40444b;
-            color: #ffffff;
-            font-size: 14px;
-            outline: none;
-            box-sizing: border-box;
-        }
-
-        input[type="text"]::placeholder {
-            color: #72767d;
-        }
-
-        input[type="text"]:focus {
-            border-color: #7289da;
-        }
-
-        button.connect {
-            background-color: #7289da;
-            color: #ffffff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        button.disconnect {
-            background-color: #7289da;
-            color: #ffffff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        button:disabled {
-            background-color: #4a4e55;
-            cursor: not-allowed;
-        }
-
-        button:hover:not(:disabled) {
-            background-color: #677bc4;
-        }
-
-        /* Стили для списка участников */
-        div[x-show="pc"] {
-            background-color: #2f3136;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #202225;
-            max-width: 400px;
-            margin: 20px auto;
-        }
-
-        h3 {
-            margin-top: 0;
-            color: #ffffff;
-        }
-
-        ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        li {
-            padding: 8px;
-            background-color: #40444b;
-            border-radius: 4px;
-            margin-bottom: 8px;
-            color: #ffffff;
-            transition: background-color 0.2s;
-        }
-
-        li.speaking {
-            background-color: #7289da;
-        }
-
-        .room {
-            max-width: 400px;
-            margin: 0 auto;
-        }
-
-        /*Стили для состояния "Disconnected"*/
-        div[x-show="!pc"] {
-            text-align: center;
-            color: #677bc4;
-            margin-top: 20px;
-        }
-
-        /* Стили для select */
-        select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #202225;
-            border-radius: 4px;
-            background-color: #40444b;
-            color: #ffffff;
-            font-size: 14px;
-            outline: none;
-            box-sizing: border-box;
-            appearance: none; /* убираем системную стрелку */
-            background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            background-size: 16px;
-            cursor: pointer;
-        }
-
-        /* При наведении */
-        select:hover {
-            border-color: #677bc4;
-        }
-
-        /* При фокусе */
-        select:focus {
-            border-color: #7289da;
-        }
-
-        /* Стили для опций */
-        select option {
-            background-color: #2f3136;
-            color: #ffffff;
-            padding: 10px;
-        }
-
-        /* Стили для чекбокса */
-        input[type="checkbox"] {
-            width: auto;
-            margin-right: 10px;
-        }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body x-data="app()" x-init="init()">
+<body x-data="app()" x-init="init()" class="bg-gray-900 text-white flex items-center justify-center min-h-screen px-4">
 
-<div x-show="!pc" class="connect_form">
-    <div>
-        <label>
-            <input
-                    type="text"
-                    placeholder="Your name"
-                    x-model="name"
-            >
-        </label>
+<div x-show="!pc" class="bg-gray-800 p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md">
+    <h1 class="text-2xl font-bold mb-6 text-center">Join a Room</h1>
+    <div class="space-y-4">
+        <div>
+            <label for="name" class="block text-sm font-medium text-gray-400">Your Name</label>
+            <input id="name" type="text" placeholder="Your name" x-model="name" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
 
-        <label>
-            <input
-                    type="text"
-                    placeholder="Enter 4-symbol code"
-                    x-model="roomCode"
-                    @input="roomCode = $event.target.value.toUpperCase(); $event.target.value = roomCode"
-                    maxlength="4"
-            >
-        </label>
+        <div>
+            <label for="roomCode" class="block text-sm font-medium text-gray-400">Room Code</label>
+            <input id="roomCode" type="text" placeholder="Enter 4-symbol code" x-model="roomCode" @input="roomCode = $event.target.value.toUpperCase(); $event.target.value = roomCode" maxlength="4" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
 
-        <!-- Выбор устройства ввода -->
-        <label>
-            Audio Input:
-            <select x-model="selectedInputDevice" @change="updateAudioDevices()">
+        <div>
+            <label for="audioInput" class="block text-sm font-medium text-gray-400">Audio Input</label>
+            <select id="audioInput" x-model="selectedInputDevice" @change="updateAudioDevices()" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                 <template x-for="device in audioInputDevices">
                     <option :value="device.deviceId" x-text="device.label || 'Default Microphone'"></option>
                 </template>
             </select>
-        </label>
+        </div>
 
-        <!-- Выбор устройства вывода -->
-        <label>
-            Audio Output:
-            <select x-model="selectedOutputDevice" @change="updateOutputDevice()">
+        <div>
+            <label for="audioOutput" class="block text-sm font-medium text-gray-400">Audio Output</label>
+            <select id="audioOutput" x-model="selectedOutputDevice" @change="updateOutputDevice()" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                 <template x-for="device in audioOutputDevices">
                     <option :value="device.deviceId" x-text="device.label || 'Default Speaker'"></option>
                 </template>
             </select>
-        </label>
+        </div>
 
-        <button @click="connect()" :disabled="!isFormValid()" class="connect">Connect</button>
+        <button @click="connect()" :disabled="!isFormValid()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed">
+            Connect
+        </button>
     </div>
 </div>
 
-<div class="room">
-    <div x-show="pc">
-        <h3>Participants</h3>
-        <ul>
-            <template x-for="participant in participants">
-                <li x-text="participant"></li>
-            </template>
-        </ul>
+<div x-show="pc" class="bg-gray-800 p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-sm sm:max-w-md" style="display: none;">
+    <h3 class="text-2xl font-bold mb-6 text-center">Participants</h3>
+    <ul class="space-y-2">
+        <template x-for="participant in participants">
+            <li x-text="participant" class="bg-gray-700 p-3 rounded-md"></li>
+        </template>
+    </ul>
 
-        <button x-show="pc" @click="disconnect()" class="disconnect">Disconnect</button>
-    </div>
+    <button x-show="pc" @click="disconnect()" class="mt-6 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md">
+        Disconnect
+    </button>
 </div>
 
-<script>
-    function app() {
-        return {
-            name: '',
-            roomCode: '',
-
-            audioInputDevices: [],
-            audioOutputDevices: [],
-            selectedInputDevice: '',
-            selectedOutputDevice: '',
-            remoteAudioElements: [],
-
-            ws: null,
-            pingInterval: null,
-
-            pc: null,
-            localStream: null,
-            participants: [],
-
-            isFormValid() {
-                const re = /[A-Z0-9]{4}/;
-                return this.name.trim().length > 0 && re.test(this.roomCode)
-            },
-
-            async init() {
-                await this.getAudioDevices();
-                // Обновляем список устройств при изменении
-                navigator.mediaDevices.addEventListener('devicechange', () => this.getAudioDevices());
-            },
-
-            async getAudioDevices() {
-                // Получаем разрешение на доступ к микрофону (требуется для получения меток устройств)
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
-                    stream.getTracks().forEach(track => track.stop());
-                } catch (err) {
-                    console.error('Error getting permissions:', err);
-                }
-
-                // Получаем список устройств
-                const devices = await navigator.mediaDevices.enumerateDevices();
-
-                this.audioInputDevices = devices.filter(d => d.kind === 'audioinput');
-                this.audioOutputDevices = devices.filter(d => d.kind === 'audiooutput');
-
-                if (this.audioInputDevices.length > 0 && !this.selectedInputDevice) {
-                    this.selectedInputDevice = this.audioInputDevices[0].deviceId;
-                }
-
-                if (this.audioOutputDevices.length > 0 && !this.selectedOutputDevice) {
-                    this.selectedOutputDevice = this.audioOutputDevices[0].deviceId;
-                }
-            },
-
-            async updateAudioDevices() {
-                if (this.localStream) {
-                    this.localStream.getTracks().forEach(track => track.stop());
-                }
-
-                const constraints = {
-                    audio: {
-                        deviceId: this.selectedInputDevice ? {exact: this.selectedInputDevice} : undefined
-                    }
-                };
-
-                this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-
-                if (this.pc) {
-                    const sender = this.pc.getSenders().find(s => s.track.kind === 'audio');
-                    if (sender) {
-                        sender.replaceTrack(this.localStream.getAudioTracks()[0]);
-                    }
-                }
-            },
-
-            async updateOutputDevice() {
-                if (this.selectedOutputDevice) {
-                    for (const audio of this.remoteAudioElements) {
-                        if ('setSinkId' in audio) {
-                            audio.setSinkId(this.selectedOutputDevice)
-                                .catch(err => console.error('Error setting audio output:', err));
-                        }
-                    }
-                }
-            },
-
-
-            async connect() {
-                try {
-                    await this.initializeWebSocket();
-                    await this.initializeWebRTC();
-                } catch (err) {
-                    console.error('Connection error:', err);
-                    alert('Connection failed: ' + err.message);
-                }
-            },
-
-            async initializeWebSocket() {
-                // TODO убрать залупу
-                this.ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`);
-
-                return new Promise((resolve, reject) => {
-                    this.ws.onopen = () => {
-                        this.ws.send(JSON.stringify({
-                            type: 'join',
-                            data: {name: this.name, room_id: this.roomCode}
-                        }));
-                        // ping-pong для поддержания соединения
-                        this.pingInterval = setInterval(() => {
-                            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                                this.ws.send(JSON.stringify({type: "ping"}));
-                            }
-                        }, 30000); // каждые 30 сек
-
-                        resolve();
-                    };
-
-                    this.ws.onerror = (err) => reject(err);
-
-                    this.ws.onmessage = (event) => this.handleWSMessage(event);
-
-                    this.ws.onclose = () => {
-                        clearInterval(this.pingInterval);
-                        this.pingInterval = null;
-                        if (this.pc) this.disconnect();
-                        alert('Connection closed');
-                    };
-                });
-            },
-
-            async initializeWebRTC() {
-                const iceReq = await fetch('/ice')
-                const iceServersResponse = await iceReq.json()
-
-                const iceServers = [
-                    {urls: 'stun:stun.l.google.com:19302'},
-                    {
-                        urls: iceServersResponse.urls,
-                        username: iceServersResponse.username,
-                        credential: iceServersResponse.credential,
-                    }
-                ]
-
-                this.pc = new RTCPeerConnection({
-                    iceServers: iceServers
-                });
-
-                // Настройка обработчиков WebRTC
-                this.pc.onicecandidate = (e) => {
-                    if (e.candidate) {
-                        this.ws.send(JSON.stringify({
-                            type: 'candidate',
-                            data: {
-                                candidate: e.candidate
-                            }
-                        }));
-                    }
-                };
-
-                // Используем выбранное устройство ввода
-                const constraints = {
-                    audio: {
-                        deviceId: this.selectedInputDevice ? {exact: this.selectedInputDevice} : undefined
-                    }
-                };
-
-                // Получение медиа потока
-                this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-
-                // Добавляем треки в peer connection
-                this.localStream.getTracks().forEach(track => {
-                    this.pc.addTrack(track, this.localStream);
-                });
-
-                // Обработка входящих треков
-                this.pc.ontrack = (event) => {
-                    if (event.track.kind === 'audio') {
-                        const audio = new Audio();
-                        audio.srcObject = event.streams[0];
-
-                        // Устанавливаем выбранное устройство вывода
-                        if (this.selectedOutputDevice && 'setSinkId' in audio) {
-                            audio.setSinkId(this.selectedOutputDevice)
-                                .catch(err => console.error('Error setting audio output:', err));
-                        }
-
-                        this.remoteAudioElements.push(audio);
-
-                        audio.play();
-                    }
-                };
-
-                const offer = await this.pc.createOffer();
-                await this.pc.setLocalDescription(offer);
-                this.ws.send(JSON.stringify({
-                    type: 'offer',
-                    data: {
-                        sdp: offer.sdp
-                    }
-                }));
-            },
-
-            async handleWSMessage(event) {
-                const message = JSON.parse(event.data);
-
-                switch (message.type) {
-                    case 'offer':
-                        await this.pc.setRemoteDescription(message);
-                        const answer = await this.pc.createAnswer();
-                        await this.pc.setLocalDescription(answer);
-                        this.ws.send(JSON.stringify({
-                            type: 'offer',
-                            data: {
-                                sdp: answer.sdp
-                            }
-                        }));
-                        break;
-
-                    case 'answer':
-                        await this.pc.setRemoteDescription(message);
-                        break;
-
-                    case 'candidate':
-                        try {
-                            await this.pc.addIceCandidate(message.candidate);
-                        } catch (err) {
-                            console.error('Error adding ICE candidate:', err);
-                        }
-                        break;
-                    case 'participants':
-                        this.updateParticipants(message.list);
-                        break;
-                    case 'error':
-                        console.error('Server error:', message.message);
-                        alert('Server error: ' + message.message);
-                        this.disconnect();
-                        break;
-                    case 'pong':
-                        console.log('Pong received');
-                        break;
-
-                    default:
-                        console.warn('Unknown message type:', message.type);
-                }
-            },
-
-            updateParticipants(participants) {
-                this.participants = participants
-            },
-
-            disconnect() {
-                if (this.pc) {
-                    this.pc.close();
-                    this.pc = null;
-                }
-
-                if (this.ws) {
-                    this.ws.close();
-                    this.ws = null;
-                }
-
-                if (this.localStream) {
-                    this.localStream.getTracks().forEach(track => track.stop());
-                    this.localStream = null;
-                }
-
-                for (const audio of this.remoteAudioElements) {
-                    audio.srcObject = null;
-                }
-                this.remoteAudioElements = [];
-            }
-        }
-    }
-</script>
+<script src="script.js"></script>
 
 </body>
 </html>
