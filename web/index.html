@@ -110,6 +110,11 @@
             border-radius: 4px;
             margin-bottom: 8px;
             color: #ffffff;
+            transition: background-color 0.2s;
+        }
+
+        li.speaking {
+            background-color: #7289da;
         }
 
         .room {
@@ -237,7 +242,7 @@
             audioOutputDevices: [],
             selectedInputDevice: '',
             selectedOutputDevice: '',
-            currentAudioElement: null,
+            remoteAudioElements: [],
 
             ws: null,
             pingInterval: null,
@@ -303,11 +308,12 @@
             },
 
             async updateOutputDevice() {
-                if (this.currentAudioElement && this.selectedOutputDevice) {
-                    // Проверяем поддержку setSinkId
-                    if ('setSinkId' in this.currentAudioElement) {
-                        this.currentAudioElement.setSinkId(this.selectedOutputDevice)
-                            .catch(err => console.error('Error setting audio output:', err));
+                if (this.selectedOutputDevice) {
+                    for (const audio of this.remoteAudioElements) {
+                        if ('setSinkId' in audio) {
+                            audio.setSinkId(this.selectedOutputDevice)
+                                .catch(err => console.error('Error setting audio output:', err));
+                        }
                     }
                 }
             },
@@ -412,6 +418,8 @@
                                 .catch(err => console.error('Error setting audio output:', err));
                         }
 
+                        this.remoteAudioElements.push(audio);
+
                         audio.play();
                     }
                 };
@@ -489,6 +497,11 @@
                     this.localStream.getTracks().forEach(track => track.stop());
                     this.localStream = null;
                 }
+
+                for (const audio of this.remoteAudioElements) {
+                    audio.srcObject = null;
+                }
+                this.remoteAudioElements = [];
             }
         }
     }
