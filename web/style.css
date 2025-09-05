@@ -1,0 +1,163 @@
+/* Основные стили */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #36393f;
+    color: #ffffff;
+    margin: 0;
+    padding: 20px;
+}
+
+/* Стили для формы */
+.connect_form {
+    background-color: #2f3136;
+    padding: 40px;
+    border-radius: 20px;
+    border: 1px solid #202225;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+label {
+    display: block;
+    margin-bottom: 15px;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #202225;
+    border-radius: 4px;
+    background-color: #40444b;
+    color: #ffffff;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+input[type="text"]::placeholder {
+    color: #72767d;
+}
+
+input[type="text"]:focus {
+    border-color: #7289da;
+}
+
+button.connect {
+    background-color: #7289da;
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+button.disconnect {
+    background-color: #7289da;
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+button:disabled {
+    background-color: #4a4e55;
+    cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+    background-color: #677bc4;
+}
+
+/* Стили для списка участников */
+div[x-show="pc"] {
+    background-color: #2f3136;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #202225;
+    max-width: 400px;
+    margin: 20px auto;
+}
+
+h3 {
+    margin-top: 0;
+    color: #ffffff;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+li {
+    padding: 8px;
+    background-color: #40444b;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    color: #ffffff;
+    transition: background-color 0.2s;
+}
+
+li.speaking {
+    background-color: #7289da;
+}
+
+.room {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+/*Стили для состояния "Disconnected"*/
+div[x-show="!pc"] {
+    text-align: center;
+    color: #677bc4;
+    margin-top: 20px;
+}
+
+/* Стили для select */
+select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #202225;
+    border-radius: 4px;
+    background-color: #40444b;
+    color: #ffffff;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    appearance: none; /* убираем системную стрелку */
+    background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 16px;
+    cursor: pointer;
+}
+
+/* При наведении */
+select:hover {
+    border-color: #677bc4;
+}
+
+/* При фокусе */
+select:focus {
+    border-color: #7289da;
+}
+
+/* Стили для опций */
+select option {
+    background-color: #2f3136;
+    color: #ffffff;
+    padding: 10px;
+}
+
+/* Стили для чекбокса */
+input[type="checkbox"] {
+    width: auto;
+    margin-right: 10px;
+}
