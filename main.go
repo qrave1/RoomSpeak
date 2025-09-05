@@ -112,7 +112,7 @@ func (r *Room) broadcastParticipants() {
 	}
 
 	for _, session := range r.sessions {
-		session.wsConn.WriteJSON(map[string]interface{}{"type": "participants", "list": parts})
+		session.WriteWS(map[string]interface{}{"type": "participants", "list": parts})
 	}
 }
 
@@ -144,10 +144,18 @@ type Session struct {
 	// TODO: move to roomID
 	room *Room
 
+	wsMu   sync.Mutex
 	wsConn *websocket.Conn
 
 	peerConn   *webrtc.PeerConnection
 	audioTrack *webrtc.TrackLocalStaticRTP
+}
+
+func (s *Session) WriteWS(v any) error {
+	s.wsMu.Lock()
+	defer s.wsMu.Unlock()
+
+	return s.wsConn.WriteJSON(v)
 }
 
 // TODO move to peerConnectionFactory
@@ -275,7 +283,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		if c == nil {
 			return
 		}
-		session.wsConn.WriteJSON(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
+		session.WriteWS(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
 	})
 
 	session.peerConn.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
@@ -285,7 +293,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 				slog.String(constant.SessionID, session.id),
 			)
 
-			err := session.wsConn.WriteJSON(map[string]interface{}{
+			err := session.WriteWS(map[string]interface{}{
 				"type":    constant.Error,
 				"message": fmt.Sprintf("peer connection bad state: %s", state.String()),
 			})
@@ -332,8 +340,10 @@ func IsConnectionClosed(err error) bool {
 		strings.Contains(err.Error(), "use of closed network connection")
 }
 
-func (h *HttpHandler) handleMessage(session *Session,
-	msg *signaling.Message) error {
+func (h *HttpHandler) handleMessage(
+	session *Session,
+	msg *signaling.Message,
+) error {
 	switch msg.Type {
 	case "join":
 		var joinEvent signaling.JoinEvent
@@ -347,7 +357,7 @@ func (h *HttpHandler) handleMessage(session *Session,
 		}
 
 		if joinEvent.RoomID == "" {
-			session.wsConn.WriteJSON(map[string]interface{}{"type": constant.Error, "message": "room_id is required"})
+			session.WriteWS(map[string]interface{}{"type": constant.Error, "message": "room_id is required"})
 			return errors.New("room_id is required")
 		}
 
@@ -386,7 +396,7 @@ func (h *HttpHandler) handleMessage(session *Session,
 			return err
 		}
 
-		return session.wsConn.WriteJSON(map[string]interface{}{"type": "answer", "sdp": answer.SDP})
+		return session.WriteWS(map[string]interface{}{"type": "answer", "sdp": answer.SDP})
 
 	case "answer":
 		var answer signaling.SdpEvent
@@ -416,13 +426,7 @@ func (h *HttpHandler) handleMessage(session *Session,
 		return session.peerConn.AddICECandidate(candidate.Candidate)
 
 	case "ping":
-		slog.Info(
-			"pong",
-			slog.Any(constant.SessionID, session.id),
-			slog.Any(constant.RoomID, session.room.id),
-		)
-
-		return session.wsConn.WriteJSON(map[string]interface{}{"type": "pong"})
+		return session.WriteWS(map[string]interface{}{"type": "pong"})
 	default:
 		return errors.New("unknown message type")
 	}
