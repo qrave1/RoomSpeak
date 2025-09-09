@@ -28,7 +28,7 @@ services:
       - "traefik.http.routers.traefik-dashboard.middlewares=auth-dashboard@file"
 
   roomspeak:
-    image: ghcr.io/qrave1/roomspeak:2025_09_04_18_35_36
+    image: ghcr.io/qrave1/roomspeak:latest
     container_name: roomspeak-backend
     restart: always
     env_file: .env
@@ -44,10 +44,8 @@ services:
   coturn:
     image: coturn/coturn:4.7-alpine
     container_name: coturn
+    command: [ "-c", "/etc/coturn/coturn.conf" ]
     restart: unless-stopped
-    ports:
-      - "3478:3478/udp"
-      - "3478:3478/tcp"
-      - "49160-49220:49160-49220/udp"
+    network_mode: "host"
     volumes:
-      - ./turnserver.conf:/etc/coturn/turnserver.conf
+      - ./coturn.conf:/etc/coturn/coturn.conf
