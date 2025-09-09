@@ -20,11 +20,13 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
-	"github.com/qrave1/RoomSpeak/internal/middleware"
-	"github.com/qrave1/RoomSpeak/internal/signaling"
 
 	"github.com/qrave1/RoomSpeak/internal/config"
 	"github.com/qrave1/RoomSpeak/internal/constant"
+	"github.com/qrave1/RoomSpeak/internal/repository"
+	"github.com/qrave1/RoomSpeak/internal/signaling"
+	"github.com/qrave1/RoomSpeak/pkg/db"
+	"github.com/qrave1/RoomSpeak/pkg/middleware"
 )
 
 type RoomManager struct {
@@ -460,17 +462,20 @@ type HttpHandler struct {
 	cfg         *config.Config
 	upgrader    *websocket.Upgrader
 	roomManager *RoomManager
+	userRepo    repository.UserRepository
 }
 
 func NewHttpHandler(
 	cfg *config.Config,
 	roomManager *RoomManager,
 	upgrader *websocket.Upgrader,
+	userRepo repository.UserRepository,
 ) *HttpHandler {
 	return &HttpHandler{
 		cfg:         cfg,
 		roomManager: roomManager,
 		upgrader:    upgrader,
+		userRepo:    userRepo,
 	}
 }
 
@@ -490,6 +495,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	dbConn, err := db.New(cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("connect to db", slog.Any(constant.Error, err))
+		os.Exit(1)
+	}
+	defer dbConn.Close()
+
+	userRepo := repository.NewUserRepo(dbConn)
+
 	slog.Info("Running app", slog.Bool("debug", cfg.Debug))
 
 	httpHandler := NewHttpHandler(
@@ -504,6 +518,7 @@ func main() {
 				return r.Header.Get("Origin") == cfg.Domain
 			},
 		},
+		userRepo,
 	)
 
 	e := echo.New()
