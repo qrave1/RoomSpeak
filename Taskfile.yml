@@ -24,3 +24,13 @@ tasks:
     deps: [ push ]
     cmds:
 
+  migrate-up:
+    desc: Apply database migrations
+    cmds:
+      - migrate -database "$DATABASE_URL" -path db/migrations up
+
+  migrate-down:
+    desc: Revert database migrations
+    cmds:
+      - migrate -database "$DATABASE_URL" -path db/migrations down
+
