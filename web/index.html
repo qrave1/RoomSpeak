@@ -25,9 +25,14 @@
             <template x-for="channel in channels">
                 <li class="flex items-center justify-between bg-gray-700 p-2 rounded">
                     <span x-text="channel"></span>
-                    <button @click="joinChannel(channel)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded">
-                        <i class="fas fa-sign-in-alt"></i>
-                    </button>
+                    <div>
+                        <button @click="joinChannel(channel)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </button>
+                        <button @click="deleteChannel(channel)" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded ml-2">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </li>
             </template>
         </ul>
@@ -70,6 +75,22 @@
             <button @click="disconnect()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mt-4">
                 <i class="fas fa-phone-slash mr-2"></i>
                 Disconnect
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div x-show="showDeleteModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center" style="display: none;">
+    <div class="bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-sm">
+        <h3 class="text-xl font-bold mb-4">Delete Channel</h3>
+        <p>Are you sure you want to delete the channel "<span x-text="channelToDelete"></span>"?</p>
+        <div class="mt-6 flex justify-end space-x-4">
+            <button @click="showDeleteModal = false" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                Cancel
+            </button>
+            <button @click="confirmDelete()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                Delete
             </button>
         </div>
     </div>

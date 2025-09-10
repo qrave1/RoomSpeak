@@ -56,6 +56,27 @@ function app() {
             }
         },
 
+        showDeleteModal: false,
+        channelToDelete: '',
+
+        async deleteChannel(channel) {
+            this.channelToDelete = channel;
+            this.showDeleteModal = true;
+        },
+
+        async confirmDelete() {
+            try {
+                await fetch(`/api/channels/${this.channelToDelete}`, {
+                    method: 'DELETE'
+                });
+                await this.getChannels();
+            } catch (err) {
+                console.error('Error deleting channel:', err);
+            }
+            this.showDeleteModal = false;
+            this.channelToDelete = '';
+        },
+
         async joinChannel(channel) {
             this.currentChannel = channel;
             await this.connect();

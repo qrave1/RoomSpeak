@@ -455,6 +455,14 @@ func (h *HttpHandler) createChannelHandler(c echo.Context) error {
 	return c.NoContent(http.StatusCreated)
 }
 
+func (h *HttpHandler) deleteChannelHandler(c echo.Context) error {
+	channelID := c.Param("id")
+
+	h.channelManager.Remove(channelID)
+
+	return c.NoContent(http.StatusOK)
+}
+
 // Handler для выдачи ICE серверов
 func (h *HttpHandler) iceServersHandler(c echo.Context) error {
 	expiration := time.Now().Add(time.Hour).Unix()
@@ -534,6 +542,7 @@ func main() {
 	api := e.Group("/api")
 	api.GET("/channels", httpHandler.listChannelsHandler)
 	api.POST("/channels", httpHandler.createChannelHandler)
+	api.DELETE("/channels/:id", httpHandler.deleteChannelHandler)
 
 	e.Static("/", "web")
 	e.GET("/ws", httpHandler.handleWebSocket)
