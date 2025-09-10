@@ -1,7 +1,9 @@
 function app() {
     return {
         name: '',
-        roomCode: '',
+        channels: [],
+        newChannelName: '',
+        currentChannel: '',
 
         audioInputDevices: [],
         audioOutputDevices: [],
@@ -16,17 +18,47 @@ function app() {
         participants: [],
         remoteAudioElements: [],
 
-        isFormValid() {
-            const re = /[A-Z0-9]{4}/;
-            return this.name.trim().length > 0 && re.test(this.roomCode)
-        },
-
         async init() {
             await this.getAudioDevices();
             // Обновляем список устройств при изменении
             navigator.mediaDevices.addEventListener('devicechange', () => this.getAudioDevices());
 
             await this.initializeWebSocket();
+            await this.getChannels();
+        },
+
+        async getChannels() {
+            try {
+                const response = await fetch('/api/channels');
+                this.channels = await response.json();
+            } catch (err) {
+                console.error('Error getting channels:', err);
+            }
+        },
+
+        async createChannel() {
+            if (!this.newChannelName.trim()) {
+                return;
+            }
+
+            try {
+                await fetch('/api/channels', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({channel_id: this.newChannelName})
+                });
+                this.newChannelName = '';
+                await this.getChannels();
+            } catch (err) {
+                console.error('Error creating channel:', err);
+            }
+        },
+
+        async joinChannel(channel) {
+            this.currentChannel = channel;
+            await this.connect();
         },
 
         async getAudioDevices() {
@@ -87,10 +119,15 @@ function app() {
 
 
         async connect() {
+            if (!this.name.trim()) {
+                alert('Please enter your name.');
+                return;
+            }
+
             try {
                 this.ws.send(JSON.stringify({
                     type: 'join',
-                    data: {name: this.name, room_id: this.roomCode}
+                    data: {name: this.name, channel_id: this.currentChannel}
                 }));
                 await this.initializeWebRTC();
             } catch (err) {
@@ -262,6 +299,7 @@ function app() {
                 audio.srcObject = null;
             }
             this.remoteAudioElements = [];
+            this.currentChannel = '';
         }
     }
 }
