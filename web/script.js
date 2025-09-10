@@ -118,8 +118,7 @@ function app() {
             this.ws.onclose = () => {
                 clearInterval(this.pingInterval);
                 this.pingInterval = null;
-                this.pc.close();
-                this.pc = null;
+                if (this.pc) this.disconnect();
                 alert('Connection closed');
             };
         },
