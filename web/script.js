@@ -7,7 +7,6 @@ function app() {
         audioOutputDevices: [],
         selectedInputDevice: '',
         selectedOutputDevice: '',
-        remoteAudioElements: [],
 
         ws: null,
         pingInterval: null,
@@ -15,6 +14,7 @@ function app() {
         pc: null,
         localStream: null,
         participants: [],
+        remoteAudioElements: [],
 
         isFormValid() {
             const re = /[A-Z0-9]{4}/;
@@ -25,6 +25,8 @@ function app() {
             await this.getAudioDevices();
             // Обновляем список устройств при изменении
             navigator.mediaDevices.addEventListener('devicechange', () => this.getAudioDevices());
+
+            await this.initializeWebSocket();
         },
 
         async getAudioDevices() {
@@ -67,7 +69,7 @@ function app() {
             if (this.pc) {
                 const sender = this.pc.getSenders().find(s => s.track.kind === 'audio');
                 if (sender) {
-                    sender.replaceTrack(this.localStream.getAudioTracks()[0]);
+                    await sender.replaceTrack(this.localStream.getAudioTracks()[0]);
                 }
             }
         },
@@ -86,11 +88,13 @@ function app() {
 
         async connect() {
             try {
-                await this.initializeWebSocket();
+                this.ws.send(JSON.stringify({
+                    type: 'join',
+                    data: {name: this.name, room_id: this.roomCode}
+                }));
                 await this.initializeWebRTC();
             } catch (err) {
                 console.error('Connection error:', err);
-                alert('Connection failed: ' + err.message);
             }
         },
 
@@ -98,33 +102,25 @@ function app() {
             // TODO убрать залупу
             this.ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`);
 
-            return new Promise((resolve, reject) => {
-                this.ws.onopen = () => {
-                    this.ws.send(JSON.stringify({
-                        type: 'join',
-                        data: {name: this.name, room_id: this.roomCode}
-                    }));
-                    // ping-pong для поддержания соединения
-                    this.pingInterval = setInterval(() => {
-                        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                            this.ws.send(JSON.stringify({type: "ping"}));
-                        }
-                    }, 30000); // каждые 30 сек
+            this.ws.onopen = () => {
+                // ping-pong для поддержания соединения
+                this.pingInterval = setInterval(() => {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({type: "ping"}));
+                    }
+                }, 30000); // каждые 30 сек
+            };
 
-                    resolve();
-                };
+            this.ws.onerror = (err) => console.error(err);
 
-                this.ws.onerror = (err) => reject(err);
+            this.ws.onmessage = (event) => this.handleWSMessage(event);
 
-                this.ws.onmessage = (event) => this.handleWSMessage(event);
-
-                this.ws.onclose = () => {
-                    clearInterval(this.pingInterval);
-                    this.pingInterval = null;
-                    if (this.pc) this.disconnect();
-                    alert('Connection closed');
-                };
-            });
+            this.ws.onclose = () => {
+                clearInterval(this.pingInterval);
+                this.pingInterval = null;
+                if (this.pc) this.disconnect();
+                alert('Connection closed');
+            };
         },
 
         async initializeWebRTC() {
@@ -253,9 +249,8 @@ function app() {
                 this.pc = null;
             }
 
-            if (this.ws) {
-                this.ws.close();
-                this.ws = null;
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({type: "leave"}));
             }
 
             if (this.localStream) {

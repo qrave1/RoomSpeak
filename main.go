@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -108,11 +107,11 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
 	defer r.mu.RUnlock()
 
 	for _, session := range r.sessions {
-		if session.id == senderID {
+		if session.id == senderID || session.peer == nil || session.peer.audioTrack == nil {
 			continue
 		}
 
-		err := session.audioTrack.WriteRTP(pkt)
+		err := session.peer.audioTrack.WriteRTP(pkt)
 
 		if err != nil {
 			slog.Error(
@@ -134,8 +133,16 @@ type Session struct {
 	wsMu   sync.Mutex
 	wsConn *websocket.Conn
 
-	peerConn   *webrtc.PeerConnection
-	audioTrack *webrtc.TrackLocalStaticRTP
+	peer     *Peer
+	joinedAt time.Time
+}
+
+func NewSession(ws *websocket.Conn) *Session {
+	return &Session{
+		id:       uuid.NewString(),
+		wsConn:   ws,
+		joinedAt: time.Now(),
+	}
 }
 
 func (s *Session) WriteWS(v any) error {
@@ -145,8 +152,13 @@ func (s *Session) WriteWS(v any) error {
 	return s.wsConn.WriteJSON(v)
 }
 
+type Peer struct {
+	peerConn   *webrtc.PeerConnection
+	audioTrack *webrtc.TrackLocalStaticRTP
+}
+
 // TODO move to peerConnectionFactory
-func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.TrackLocalStaticRTP, error) {
+func createPeerConnection(cfg *config.Config) (*Peer, error) {
 	pc, err := webrtc.NewPeerConnection(
 		webrtc.Configuration{
 			ICEServers: []webrtc.ICEServer{
@@ -159,31 +171,21 @@ func createPeerConnection(cfg *config.Config) (*webrtc.PeerConnection, *webrtc.T
 		},
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	audioTrack, err := webrtc.NewTrackLocalStaticRTP(
 		webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "RoomSpeak",
 	)
 	if err != nil {
-		slog.Error(
-			"create audio track",
-			slog.Any(constant.Error, err),
-		)
-
-		return nil, nil, err
+		return nil, fmt.Errorf("create audio track: %w", err)
 	}
 
 	if _, err = pc.AddTrack(audioTrack); err != nil {
-		slog.Error(
-			"add audio track",
-			slog.Any(constant.Error, err),
-		)
-
-		return nil, nil, err
+		return nil, fmt.Errorf("add audio track: %w", err)
 	}
 
-	return pc, audioTrack, nil
+	return &Peer{peerConn: pc, audioTrack: audioTrack}, nil
 }
 
 func (h *HttpHandler) handleWebSocket(c echo.Context) error {
@@ -206,10 +208,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		return nil
 	})
 
-	session := &Session{
-		id:     uuid.NewString(),
-		wsConn: ws,
-	}
+	session := NewSession(ws)
 
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -228,69 +227,17 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		}
 	}()
 
-	session.peerConn, session.audioTrack, err = createPeerConnection(h.cfg)
-	if err != nil {
-		slog.Error("create peer connection", slog.Any(constant.Error, err))
-
-		return nil
-	}
-
 	defer func() {
 		if session.room != nil {
+			session.room.RemoveSession(session.id)
 			if len(session.room.sessions) == 0 {
 				h.roomManager.Remove(session.room.id)
-			} else {
-				session.room.RemoveSession(session.id)
 			}
 		}
-		session.peerConn.Close()
+		if session.peer != nil && session.peer.peerConn != nil {
+			session.peer.peerConn.Close()
+		}
 	}()
-
-	// TODO: вынести все хендлеры для peerConnection в пакет signaling
-	session.peerConn.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		go func() {
-			for {
-				pkt, _, err := track.ReadRTP()
-				if err != nil {
-					if !errors.Is(err, io.EOF) {
-						slog.Error("RTP read error", "error", err)
-					}
-
-					return
-				}
-
-				if track.Kind() == webrtc.RTPCodecTypeAudio {
-					session.room.BroadcastRTP(pkt, session.id)
-				}
-			}
-		}()
-	})
-
-	session.peerConn.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c == nil {
-			return
-		}
-		session.WriteWS(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
-	})
-
-	session.peerConn.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateDisconnected {
-			slog.Error("PeerConnection bad status",
-				slog.String(constant.State, state.String()),
-				slog.String(constant.SessionID, session.id),
-			)
-
-			err := session.WriteWS(map[string]interface{}{
-				"type":    constant.Error,
-				"message": fmt.Sprintf("peer connection bad state: %s", state.String()),
-			})
-			if err != nil {
-				slog.Error("send peer connection state", slog.Any(constant.Error, err))
-				return
-			}
-			return
-		}
-	})
 
 	for {
 		select {
@@ -298,7 +245,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 			return nil
 		default:
 			_, msg, err := session.wsConn.ReadMessage()
-			if err != nil && IsConnectionClosed(err) {
+			if err != nil {
 				slog.Error(
 					"webSocket read error",
 					slog.Any(constant.Error, err),
@@ -309,22 +256,17 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 
 			signalMessage := new(signaling.Message)
 
-			if err := json.Unmarshal(msg, &signalMessage); err != nil {
-				return err
+			if err = json.Unmarshal(msg, &signalMessage); err != nil {
+				slog.Error("unmarshal websocket message", slog.Any(constant.Error, err))
+
+				return nil
 			}
 
-			if err := h.handleMessage(session, signalMessage); err != nil {
+			if err = h.handleMessage(session, signalMessage); err != nil {
 				slog.Error("handle message", slog.Any(constant.Error, err))
 			}
 		}
 	}
-}
-
-// IsConnectionClosed проверяет, закрыто ли соединение
-func IsConnectionClosed(err error) bool {
-	return websocket.IsCloseError(err) ||
-		websocket.IsUnexpectedCloseError(err) ||
-		strings.Contains(err.Error(), "use of closed network connection")
 }
 
 func (h *HttpHandler) handleMessage(
@@ -356,6 +298,59 @@ func (h *HttpHandler) handleMessage(
 
 		session.room = room
 
+		var err error
+		session.peer, err = createPeerConnection(h.cfg)
+		if err != nil {
+			slog.Error("create peer connection", slog.Any(constant.Error, err))
+
+			return nil
+		}
+
+		session.peer.peerConn.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+			go func() {
+				for {
+					pkt, _, err := track.ReadRTP()
+					if err != nil {
+						if !errors.Is(err, io.EOF) {
+							slog.Error("RTP read error", "error", err)
+						}
+
+						return
+					}
+
+					if track.Kind() == webrtc.RTPCodecTypeAudio {
+						session.room.BroadcastRTP(pkt, session.id)
+					}
+				}
+			}()
+		})
+
+		session.peer.peerConn.OnICECandidate(func(c *webrtc.ICECandidate) {
+			if c == nil {
+				return
+			}
+			session.WriteWS(map[string]interface{}{"type": "candidate", "candidate": c.ToJSON()})
+		})
+
+		session.peer.peerConn.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+			if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateDisconnected {
+				slog.Error("PeerConnection bad status",
+					slog.String(constant.State, state.String()),
+					slog.String(constant.SessionID, session.id),
+				)
+
+				err := session.WriteWS(map[string]interface{}{
+					"type":    constant.Error,
+					"message": fmt.Sprintf("peer connection bad state: %s", state.String()),
+				})
+				if err != nil {
+					slog.Error("send peer connection state", slog.Any(constant.Error, err))
+					return
+				}
+				return
+			}
+		})
+
 	case "offer":
 		var offer signaling.SdpEvent
 
@@ -363,7 +358,7 @@ func (h *HttpHandler) handleMessage(
 			return err
 		}
 
-		if err := session.peerConn.SetRemoteDescription(
+		if err := session.peer.peerConn.SetRemoteDescription(
 			webrtc.SessionDescription{
 				Type: webrtc.SDPTypeOffer,
 				SDP:  offer.SDP,
@@ -372,12 +367,12 @@ func (h *HttpHandler) handleMessage(
 			return err
 		}
 
-		answer, err := session.peerConn.CreateAnswer(nil)
+		answer, err := session.peer.peerConn.CreateAnswer(nil)
 		if err != nil {
 			return err
 		}
 
-		if err = session.peerConn.SetLocalDescription(answer); err != nil {
+		if err = session.peer.peerConn.SetLocalDescription(answer); err != nil {
 			slog.Error("set local description", slog.Any(constant.Error, err))
 
 			return err
@@ -392,7 +387,7 @@ func (h *HttpHandler) handleMessage(
 			return err
 		}
 
-		if err := session.peerConn.SetRemoteDescription(
+		if err := session.peer.peerConn.SetRemoteDescription(
 			webrtc.SessionDescription{
 				Type: webrtc.SDPTypeAnswer,
 				SDP:  answer.SDP,
@@ -410,8 +405,18 @@ func (h *HttpHandler) handleMessage(
 			return err
 		}
 
-		return session.peerConn.AddICECandidate(candidate.Candidate)
+		return session.peer.peerConn.AddICECandidate(candidate.Candidate)
 
+	case "leave":
+		if session.room != nil {
+			session.room.RemoveSession(session.id)
+			if len(session.room.sessions) == 0 {
+				h.roomManager.Remove(session.room.id)
+			}
+		}
+		if session.peer != nil && session.peer.peerConn != nil {
+			session.peer.peerConn.Close()
+		}
 	case "ping":
 		return session.WriteWS(map[string]interface{}{"type": "pong"})
 	default:
