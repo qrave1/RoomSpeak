@@ -16,12 +16,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
 
 	"github.com/qrave1/RoomSpeak/internal/config"
 	"github.com/qrave1/RoomSpeak/internal/constant"
+	"github.com/qrave1/RoomSpeak/internal/db"
 	"github.com/qrave1/RoomSpeak/internal/middleware"
 	"github.com/qrave1/RoomSpeak/internal/signaling"
 )
@@ -187,7 +189,7 @@ func createPeerConnection(cfg *config.Config) (*Peer, error) {
 	}
 
 	audioTrack, err := webrtc.NewTrackLocalStaticRTP(
-		webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "RoomSpeak",
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "RoomSpeak",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create audio track: %w", err)
@@ -489,17 +491,20 @@ type HttpHandler struct {
 	cfg            *config.Config
 	upgrader       *websocket.Upgrader
 	channelManager *ChannelManager
+	db             *sqlx.DB
 }
 
 func NewHttpHandler(
 	cfg *config.Config,
 	channelManager *ChannelManager,
 	upgrader *websocket.Upgrader,
+	db *sqlx.DB,
 ) *HttpHandler {
 	return &HttpHandler{
 		cfg:            cfg,
 		channelManager: channelManager,
 		upgrader:       upgrader,
+		db:             db,
 	}
 }
 
@@ -521,6 +526,13 @@ func main() {
 
 	slog.Info("Running app", slog.Bool("debug", cfg.Debug))
 
+	dbConn, err := db.NewPostgres(cfg.PostgresURL)
+	if err != nil {
+		slog.Error("connect to postgres", slog.Any(constant.Error, err))
+		os.Exit(1)
+	}
+	defer dbConn.Close()
+
 	httpHandler := NewHttpHandler(
 		cfg,
 		NewChannelManager(),
@@ -533,6 +545,7 @@ func main() {
 				return r.Header.Get("Origin") == cfg.Domain
 			},
 		},
+		dbConn,
 	)
 
 	e := echo.New()
