@@ -228,24 +228,6 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		}
 	}()
 
-	session.peerConn, session.audioTrack, err = createPeerConnection(h.cfg)
-	if err != nil {
-		slog.Error("create peer connection", slog.Any(constant.Error, err))
-
-		return nil
-	}
-
-	defer func() {
-		if session.room != nil {
-			if len(session.room.sessions) == 0 {
-				h.roomManager.Remove(session.room.id)
-			} else {
-				session.room.RemoveSession(session.id)
-			}
-		}
-		session.peerConn.Close()
-	}()
-
 	// TODO: вынести все хендлеры для peerConnection в пакет signaling
 	session.peerConn.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		go func() {
@@ -356,6 +338,15 @@ func (h *HttpHandler) handleMessage(
 
 		session.room = room
 
+		var err error
+		
+		session.peerConn, session.audioTrack, err = createPeerConnection(h.cfg)
+		if err != nil {
+			slog.Error("create peer connection", slog.Any(constant.Error, err))
+
+			return nil
+		}
+
 	case "offer":
 		var offer signaling.SdpEvent
 
@@ -412,6 +403,16 @@ func (h *HttpHandler) handleMessage(
 
 		return session.peerConn.AddICECandidate(candidate.Candidate)
 
+	case "leave":
+		if session.room != nil {
+			session.room.RemoveSession(session.id)
+			if len(session.room.sessions) == 0 {
+				h.roomManager.Remove(session.room.id)
+			}
+		}
+		if session.peerConn != nil {
+			session.peerConn.Close()
+		}
 	case "ping":
 		return session.WriteWS(map[string]interface{}{"type": "pong"})
 	default:
