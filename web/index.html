@@ -19,80 +19,79 @@
 
 <div class="flex h-screen">
     <!-- Sidebar -->
-    <div x-show="pc" class="w-64 bg-gray-800 p-4 flex flex-col">
-        <h3 class="text-xl font-bold mb-4">Participants</h3>
+    <div class="w-64 bg-gray-800 p-4 flex flex-col">
+        <h3 class="text-xl font-bold mb-4">Channels</h3>
         <ul class="space-y-2 flex-grow">
-            <template x-for="participant in participants">
-                <li class="flex items-center bg-gray-700 p-2 rounded">
-                    <i class="fas fa-user mr-2"></i>
-                    <span x-text="participant"></span>
+            <template x-for="channel in channels">
+                <li class="flex items-center justify-between bg-gray-700 p-2 rounded">
+                    <span x-text="channel"></span>
+                    <div>
+                        <button @click="joinChannel(channel)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </button>
+                        <button @click="deleteChannel(channel)" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded ml-2">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </li>
             </template>
         </ul>
-        <button @click="disconnect()"
-                class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mt-4">
-            <i class="fas fa-phone-slash mr-2"></i>
-            Disconnect
-        </button>
+        <div class="mt-4">
+            <h3 class="text-xl font-bold mb-2">Your Name</h3>
+            <div class="relative">
+                <input type="text" x-model="name" placeholder="Your Name" class="pl-10 pr-4 py-2 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <i class="fas fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            </div>
+        </div>
+        <div class="mt-4">
+            <h3 class="text-xl font-bold mb-2">Create Channel</h3>
+            <div class="relative">
+                <input type="text" x-model="newChannelName" placeholder="Channel Name" class="pl-10 pr-4 py-2 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <i class="fas fa-plus absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            </div>
+            <button @click="createChannel()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-2">
+                Create
+            </button>
+        </div>
     </div>
 
     <!-- Main Content -->
     <div class="flex-grow flex items-center justify-center p-4">
         <div x-show="!pc" class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
-            <h1 class="text-2xl font-bold mb-6 text-center">Join a Room</h1>
-            <div class="space-y-4">
-                <div>
-                    <label for="name" class="block text-sm font-medium text-gray-400">Your Name</label>
-                    <div class="relative">
-                        <i class="fas fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input id="name" type="text" placeholder="Your name" x-model="name"
-                               class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                </div>
+            <h1 class="text-2xl font-bold mb-6 text-center">Welcome to RoomSpeak</h1>
+            <p class="text-center text-gray-400">Select a channel to join or create a new one.</p>
+        </div>
 
-                <div>
-                    <label for="roomCode" class="block text-sm font-medium text-gray-400">Room Code</label>
-                    <div class="relative">
-                        <i class="fas fa-hashtag absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input id="roomCode" type="text" placeholder="Enter 4-symbol code" x-model="roomCode"
-                               @input="roomCode = $event.target.value.toUpperCase(); $event.target.value = roomCode"
-                               maxlength="4"
-                               class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                </div>
+        <div x-show="pc" class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Participants in <span x-text="currentChannel"></span></h3>
+            <ul class="space-y-2 flex-grow">
+                <template x-for="participant in participants">
+                    <li class="flex items-center bg-gray-700 p-2 rounded">
+                        <i class="fas fa-user mr-2"></i>
+                        <span x-text="participant"></span>
+                    </li>
+                </template>
+            </ul>
+            <button @click="disconnect()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mt-4">
+                <i class="fas fa-phone-slash mr-2"></i>
+                Disconnect
+            </button>
+        </div>
+    </div>
+</div>
 
-                <div>
-                    <label for="audioInput" class="block text-sm font-medium text-gray-400">Audio Input</label>
-                    <div class="relative">
-                        <i class="fas fa-microphone absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <select id="audioInput" x-model="selectedInputDevice" @change="updateAudioDevices()"
-                                class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                            <template x-for="device in audioInputDevices">
-                                <option :value="device.deviceId" x-text="device.label || 'Default Microphone'"></option>
-                            </template>
-                        </select>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="audioOutput" class="block text-sm font-medium text-gray-400">Audio Output</label>
-                    <div class="relative">
-                        <i class="fas fa-volume-up absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <select id="audioOutput" x-model="selectedOutputDevice" @change="updateOutputDevice()"
-                                class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                            <template x-for="device in audioOutputDevices">
-                                <option :value="device.deviceId" x-text="device.label || 'Default Speaker'"></option>
-                            </template>
-                        </select>
-                    </div>
-                </div>
-
-                <button @click="connect()" :disabled="!isFormValid()"
-                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed">
-                    <i class="fas fa-sign-in-alt mr-2"></i>
-                    Connect
-                </button>
-            </div>
+<!-- Modal -->
+<div x-show="showDeleteModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center" style="display: none;">
+    <div class="bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-sm">
+        <h3 class="text-xl font-bold mb-4">Delete Channel</h3>
+        <p>Are you sure you want to delete the channel "<span x-text="channelToDelete"></span>"?</p>
+        <div class="mt-6 flex justify-end space-x-4">
+            <button @click="showDeleteModal = false" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                Cancel
+            </button>
+            <button @click="confirmDelete()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                Delete
+            </button>
         </div>
     </div>
 </div>

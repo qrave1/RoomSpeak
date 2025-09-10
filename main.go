@@ -26,87 +26,100 @@ import (
 	"github.com/qrave1/RoomSpeak/internal/signaling"
 )
 
-type RoomManager struct {
-	rooms map[string]*Room
-	mu    sync.RWMutex
+type ChannelManager struct {
+	channels map[string]*Channel
+	mu       sync.RWMutex
 }
 
-func NewRoomManager() *RoomManager {
-	return &RoomManager{
-		rooms: make(map[string]*Room),
+func NewChannelManager() *ChannelManager {
+	return &ChannelManager{
+		channels: make(map[string]*Channel),
 	}
 }
 
-func (rm *RoomManager) GetOrCreate(roomID string) *Room {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
+func (cm *ChannelManager) GetOrCreate(channelID string) *Channel {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 
-	if room, exists := rm.rooms[roomID]; exists {
-		return room
+	if channel, exists := cm.channels[channelID]; exists {
+		return channel
 	}
 
-	room := NewRoom(roomID)
+	channel := NewChannel(channelID)
 
-	rm.rooms[roomID] = room
+	cm.channels[channelID] = channel
 
-	return room
+	return channel
 }
 
-func (rm *RoomManager) Remove(roomID string) {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
+func (cm *ChannelManager) Remove(channelID string) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 
-	delete(rm.rooms, roomID)
+	delete(cm.channels, channelID)
 }
 
-type Room struct {
+func (cm *ChannelManager) ListIDs() []string {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	listIDs := make([]string, 0, len(cm.channels))
+
+	for _, ch := range cm.channels {
+		listIDs = append(listIDs, ch.id)
+	}
+
+	return listIDs
+}
+
+type Channel struct {
 	id       string
 	sessions map[string]*Session
 	mu       sync.RWMutex
 }
 
-func NewRoom(id string) *Room {
-	return &Room{
+func NewChannel(id string) *Channel {
+	return &Channel{
 		id:       id,
 		sessions: make(map[string]*Session),
 	}
 }
 
-func (r *Room) AddSession(c *Session) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (c *Channel) AddSession(s *Session) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	r.sessions[c.id] = c
+	c.sessions[s.id] = s
 
-	r.broadcastParticipants()
+	c.broadcastParticipants()
 }
 
-func (r *Room) RemoveSession(sessionID string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (c *Channel) RemoveSession(sessionID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	delete(r.sessions, sessionID)
+	delete(c.sessions, sessionID)
 
-	r.broadcastParticipants()
+	c.broadcastParticipants()
 }
 
-func (r *Room) broadcastParticipants() {
-	parts := make([]string, 0, len(r.sessions))
+func (c *Channel) broadcastParticipants() {
+	parts := make([]string, 0, len(c.sessions))
 
-	for _, session := range r.sessions {
+	for _, session := range c.sessions {
 		parts = append(parts, session.name)
 	}
 
-	for _, session := range r.sessions {
+	for _, session := range c.sessions {
 		session.WriteWS(map[string]interface{}{"type": "participants", "list": parts})
 	}
 }
 
-func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (c *Channel) BroadcastRTP(pkt *rtp.Packet, senderID string) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-	for _, session := range r.sessions {
+	for _, session := range c.sessions {
 		if session.id == senderID || session.peer == nil || session.peer.audioTrack == nil {
 			continue
 		}
@@ -127,8 +140,7 @@ type Session struct {
 	id   string
 	name string
 
-	// TODO: move to roomID
-	room *Room
+	channel *Channel
 
 	wsMu   sync.Mutex
 	wsConn *websocket.Conn
@@ -228,11 +240,8 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 	}()
 
 	defer func() {
-		if session.room != nil {
-			session.room.RemoveSession(session.id)
-			if len(session.room.sessions) == 0 {
-				h.roomManager.Remove(session.room.id)
-			}
+		if session.channel != nil {
+			session.channel.RemoveSession(session.id)
 		}
 		if session.peer != nil && session.peer.peerConn != nil {
 			session.peer.peerConn.Close()
@@ -285,18 +294,18 @@ func (h *HttpHandler) handleMessage(
 			joinEvent.Name = "Anonymous"
 		}
 
-		if joinEvent.RoomID == "" {
-			session.WriteWS(map[string]interface{}{"type": constant.Error, "message": "room_id is required"})
+		if joinEvent.ChannelID == "" {
+			session.WriteWS(map[string]interface{}{"type": constant.Error, "message": "channel_id is required"})
 			return nil
 		}
 
 		session.name = joinEvent.Name
 
-		room := h.roomManager.GetOrCreate(joinEvent.RoomID)
+		channel := h.channelManager.GetOrCreate(joinEvent.ChannelID)
 
-		room.AddSession(session)
+		channel.AddSession(session)
 
-		session.room = room
+		session.channel = channel
 
 		var err error
 		session.peer, err = createPeerConnection(h.cfg)
@@ -319,7 +328,7 @@ func (h *HttpHandler) handleMessage(
 					}
 
 					if track.Kind() == webrtc.RTPCodecTypeAudio {
-						session.room.BroadcastRTP(pkt, session.id)
+						session.channel.BroadcastRTP(pkt, session.id)
 					}
 				}
 			}()
@@ -408,11 +417,8 @@ func (h *HttpHandler) handleMessage(
 		return session.peer.peerConn.AddICECandidate(candidate.Candidate)
 
 	case "leave":
-		if session.room != nil {
-			session.room.RemoveSession(session.id)
-			if len(session.room.sessions) == 0 {
-				h.roomManager.Remove(session.room.id)
-			}
+		if session.channel != nil {
+			session.channel.RemoveSession(session.id)
 		}
 		if session.peer != nil && session.peer.peerConn != nil {
 			session.peer.peerConn.Close()
@@ -424,6 +430,37 @@ func (h *HttpHandler) handleMessage(
 	}
 
 	return nil
+}
+
+func (h *HttpHandler) listChannelsHandler(c echo.Context) error {
+	return c.JSON(http.StatusOK, h.channelManager.ListIDs())
+}
+
+type CreateChannelRequest struct {
+	ChannelID string `json:"channel_id"`
+}
+
+func (h *HttpHandler) createChannelHandler(c echo.Context) error {
+	var req CreateChannelRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+
+	if req.ChannelID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "channel_id is required"})
+	}
+
+	h.channelManager.GetOrCreate(req.ChannelID)
+
+	return c.NoContent(http.StatusCreated)
+}
+
+func (h *HttpHandler) deleteChannelHandler(c echo.Context) error {
+	channelID := c.Param("id")
+
+	h.channelManager.Remove(channelID)
+
+	return c.NoContent(http.StatusOK)
 }
 
 // Handler для выдачи ICE серверов
@@ -449,20 +486,20 @@ func (h *HttpHandler) iceServersHandler(c echo.Context) error {
 }
 
 type HttpHandler struct {
-	cfg         *config.Config
-	upgrader    *websocket.Upgrader
-	roomManager *RoomManager
+	cfg            *config.Config
+	upgrader       *websocket.Upgrader
+	channelManager *ChannelManager
 }
 
 func NewHttpHandler(
 	cfg *config.Config,
-	roomManager *RoomManager,
+	channelManager *ChannelManager,
 	upgrader *websocket.Upgrader,
 ) *HttpHandler {
 	return &HttpHandler{
-		cfg:         cfg,
-		roomManager: roomManager,
-		upgrader:    upgrader,
+		cfg:            cfg,
+		channelManager: channelManager,
+		upgrader:       upgrader,
 	}
 }
 
@@ -486,7 +523,7 @@ func main() {
 
 	httpHandler := NewHttpHandler(
 		cfg,
-		NewRoomManager(),
+		NewChannelManager(),
 		&websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				if cfg.Debug {
@@ -501,6 +538,11 @@ func main() {
 	e := echo.New()
 
 	e.Use(middleware.SlogLogger())
+
+	api := e.Group("/api")
+	api.GET("/channels", httpHandler.listChannelsHandler)
+	api.POST("/channels", httpHandler.createChannelHandler)
+	api.DELETE("/channels/:id", httpHandler.deleteChannelHandler)
 
 	e.Static("/", "web")
 	e.GET("/ws", httpHandler.handleWebSocket)
