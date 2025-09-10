@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -134,12 +133,16 @@ type Session struct {
 	wsMu   sync.Mutex
 	wsConn *websocket.Conn
 
-	peer *Peer
+	peer     *Peer
+	joinedAt time.Time
 }
 
-type Peer struct {
-	peerConn   *webrtc.PeerConnection
-	audioTrack *webrtc.TrackLocalStaticRTP
+func NewSession(ws *websocket.Conn) *Session {
+	return &Session{
+		id:       uuid.NewString(),
+		wsConn:   ws,
+		joinedAt: time.Now(),
+	}
 }
 
 func (s *Session) WriteWS(v any) error {
@@ -147,6 +150,11 @@ func (s *Session) WriteWS(v any) error {
 	defer s.wsMu.Unlock()
 
 	return s.wsConn.WriteJSON(v)
+}
+
+type Peer struct {
+	peerConn   *webrtc.PeerConnection
+	audioTrack *webrtc.TrackLocalStaticRTP
 }
 
 // TODO move to peerConnectionFactory
@@ -170,21 +178,11 @@ func createPeerConnection(cfg *config.Config) (*Peer, error) {
 		webrtc.RTPCodecCapability{MimeType: "audio/opus"}, "audio", "RoomSpeak",
 	)
 	if err != nil {
-		slog.Error(
-			"create audio track",
-			slog.Any(constant.Error, err),
-		)
-
-		return nil, err
+		return nil, fmt.Errorf("create audio track: %w", err)
 	}
 
 	if _, err = pc.AddTrack(audioTrack); err != nil {
-		slog.Error(
-			"add audio track",
-			slog.Any(constant.Error, err),
-		)
-
-		return nil, err
+		return nil, fmt.Errorf("add audio track: %w", err)
 	}
 
 	return &Peer{peerConn: pc, audioTrack: audioTrack}, nil
@@ -210,10 +208,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		return nil
 	})
 
-	session := &Session{
-		id:     uuid.NewString(),
-		wsConn: ws,
-	}
+	session := NewSession(ws)
 
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -231,8 +226,6 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 			}
 		}
 	}()
-
-	
 
 	defer func() {
 		if session.room != nil {
@@ -252,7 +245,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 			return nil
 		default:
 			_, msg, err := session.wsConn.ReadMessage()
-			if err != nil && IsConnectionClosed(err) {
+			if err != nil {
 				slog.Error(
 					"webSocket read error",
 					slog.Any(constant.Error, err),
@@ -263,22 +256,17 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 
 			signalMessage := new(signaling.Message)
 
-			if err := json.Unmarshal(msg, &signalMessage); err != nil {
-				return err
+			if err = json.Unmarshal(msg, &signalMessage); err != nil {
+				slog.Error("unmarshal websocket message", slog.Any(constant.Error, err))
+
+				return nil
 			}
 
-			if err := h.handleMessage(session, signalMessage); err != nil {
+			if err = h.handleMessage(session, signalMessage); err != nil {
 				slog.Error("handle message", slog.Any(constant.Error, err))
 			}
 		}
 	}
-}
-
-// IsConnectionClosed проверяет, закрыто ли соединение
-func IsConnectionClosed(err error) bool {
-	return websocket.IsCloseError(err) ||
-		websocket.IsUnexpectedCloseError(err) ||
-		strings.Contains(err.Error(), "use of closed network connection")
 }
 
 func (h *HttpHandler) handleMessage(

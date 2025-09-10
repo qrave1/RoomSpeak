@@ -29,7 +29,8 @@
                 </li>
             </template>
         </ul>
-        <button @click="disconnect()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mt-4">
+        <button @click="disconnect()"
+                class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mt-4">
             <i class="fas fa-phone-slash mr-2"></i>
             Disconnect
         </button>
@@ -44,7 +45,8 @@
                     <label for="name" class="block text-sm font-medium text-gray-400">Your Name</label>
                     <div class="relative">
                         <i class="fas fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input id="name" type="text" placeholder="Your name" x-model="name" class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <input id="name" type="text" placeholder="Your name" x-model="name"
+                               class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                     </div>
                 </div>
 
@@ -52,7 +54,10 @@
                     <label for="roomCode" class="block text-sm font-medium text-gray-400">Room Code</label>
                     <div class="relative">
                         <i class="fas fa-hashtag absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <input id="roomCode" type="text" placeholder="Enter 4-symbol code" x-model="roomCode" @input="roomCode = $event.target.value.toUpperCase(); $event.target.value = roomCode" maxlength="4" class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <input id="roomCode" type="text" placeholder="Enter 4-symbol code" x-model="roomCode"
+                               @input="roomCode = $event.target.value.toUpperCase(); $event.target.value = roomCode"
+                               maxlength="4"
+                               class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                     </div>
                 </div>
 
@@ -60,7 +65,8 @@
                     <label for="audioInput" class="block text-sm font-medium text-gray-400">Audio Input</label>
                     <div class="relative">
                         <i class="fas fa-microphone absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <select id="audioInput" x-model="selectedInputDevice" @change="updateAudioDevices()" class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <select id="audioInput" x-model="selectedInputDevice" @change="updateAudioDevices()"
+                                class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                             <template x-for="device in audioInputDevices">
                                 <option :value="device.deviceId" x-text="device.label || 'Default Microphone'"></option>
                             </template>
@@ -72,7 +78,8 @@
                     <label for="audioOutput" class="block text-sm font-medium text-gray-400">Audio Output</label>
                     <div class="relative">
                         <i class="fas fa-volume-up absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                        <select id="audioOutput" x-model="selectedOutputDevice" @change="updateOutputDevice()" class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <select id="audioOutput" x-model="selectedOutputDevice" @change="updateOutputDevice()"
+                                class="pl-10 mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                             <template x-for="device in audioOutputDevices">
                                 <option :value="device.deviceId" x-text="device.label || 'Default Speaker'"></option>
                             </template>
@@ -80,7 +87,8 @@
                     </div>
                 </div>
 
-                <button @click="connect()" :disabled="!isFormValid()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed">
+                <button @click="connect()" :disabled="!isFormValid()"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md disabled:bg-gray-600 disabled:cursor-not-allowed">
                     <i class="fas fa-sign-in-alt mr-2"></i>
                     Connect
                 </button>

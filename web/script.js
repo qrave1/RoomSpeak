@@ -7,7 +7,6 @@ function app() {
         audioOutputDevices: [],
         selectedInputDevice: '',
         selectedOutputDevice: '',
-        remoteAudioElements: [],
 
         ws: null,
         pingInterval: null,
@@ -15,6 +14,7 @@ function app() {
         pc: null,
         localStream: null,
         participants: [],
+        remoteAudioElements: [],
 
         isFormValid() {
             const re = /[A-Z0-9]{4}/;
@@ -69,7 +69,7 @@ function app() {
             if (this.pc) {
                 const sender = this.pc.getSenders().find(s => s.track.kind === 'audio');
                 if (sender) {
-                    sender.replaceTrack(this.localStream.getAudioTracks()[0]);
+                    await sender.replaceTrack(this.localStream.getAudioTracks()[0]);
                 }
             }
         },
@@ -118,6 +118,8 @@ function app() {
             this.ws.onclose = () => {
                 clearInterval(this.pingInterval);
                 this.pingInterval = null;
+                this.pc.close();
+                this.pc = null;
                 alert('Connection closed');
             };
         },
