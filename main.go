@@ -11,11 +11,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/pion/rtp"
@@ -25,6 +23,7 @@ import (
 	"github.com/qrave1/RoomSpeak/internal/constant"
 	"github.com/qrave1/RoomSpeak/internal/repository"
 	"github.com/qrave1/RoomSpeak/internal/signaling"
+	"github.com/qrave1/RoomSpeak/internal/user"
 	"github.com/qrave1/RoomSpeak/pkg/db"
 	"github.com/qrave1/RoomSpeak/pkg/middleware"
 )
@@ -64,29 +63,30 @@ func (rm *RoomManager) Remove(roomID string) {
 
 type Room struct {
 	id       string
-	sessions map[string]*Session
+	sessions map[string]*signaling.Session
 	mu       sync.RWMutex
 }
 
 func NewRoom(id string) *Room {
 	return &Room{
 		id:       id,
-		sessions: make(map[string]*Session),
+		sessions: make(map[string]*signaling.Session),
 	}
 }
 
-func (r *Room) AddSession(c *Session) {
+func (r *Room) AddSession(s *signaling.Session) {
+	// TODO: move log
 	slog.Info(
 		"Session joined room",
-		slog.String(constant.SessionID, c.id),
-		slog.String(constant.SessionName, c.name),
-		slog.String(constant.RoomID, r.id),
+		slog.String(constant.SessionID, s.ID),
+		slog.String(constant.SessionName, s.Name),
+		slog.String(constant.RoomID, s.RoomID),
 	)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.sessions[c.id] = c
+	r.sessions[s.ID] = s
 
 	r.broadcastParticipants()
 }
@@ -110,7 +110,7 @@ func (r *Room) broadcastParticipants() {
 	parts := make([]string, 0, len(r.sessions))
 
 	for _, session := range r.sessions {
-		parts = append(parts, session.name)
+		parts = append(parts, session.Name)
 	}
 
 	for _, session := range r.sessions {
@@ -123,11 +123,11 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
 	defer r.mu.RUnlock()
 
 	for _, session := range r.sessions {
-		if session.id == senderID {
+		if session.ID == senderID {
 			continue
 		}
 
-		err := session.audioTrack.WriteRTP(pkt)
+		err := session.WriteRTP(pkt)
 
 		if err != nil {
 			slog.Error(
@@ -137,27 +137,6 @@ func (r *Room) BroadcastRTP(pkt *rtp.Packet, senderID string) {
 			)
 		}
 	}
-}
-
-type Session struct {
-	id   string
-	name string
-
-	// TODO: move to roomID
-	room *Room
-
-	wsMu   sync.Mutex
-	wsConn *websocket.Conn
-
-	peerConn   *webrtc.PeerConnection
-	audioTrack *webrtc.TrackLocalStaticRTP
-}
-
-func (s *Session) WriteWS(v any) error {
-	s.wsMu.Lock()
-	defer s.wsMu.Unlock()
-
-	return s.wsConn.WriteJSON(v)
 }
 
 // TODO move to peerConnectionFactory
@@ -210,56 +189,26 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 		)
 		return err
 	}
-	defer ws.Close()
 
-	err = ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+	session := signaling.NewSession()
+	defer session.Close()
+
+	err = signaling.ConfigureWebsocket(c.Request().Context(), ws)
 	if err != nil {
-		return err
-	}
-	ws.SetPongHandler(func(string) error {
-		ws.SetReadDeadline(time.Now().Add(60 * time.Second))
+		slog.Error("failed to configure websocket", slog.Any(constant.Error, err))
+
 		return nil
-	})
-
-	session := &Session{
-		id:     uuid.NewString(),
-		wsConn: ws,
 	}
 
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				if err := ws.WriteMessage(websocket.PingMessage, nil); err != nil {
-					slog.Error("ping failed", slog.Any(constant.Error, err))
-					return
-				}
-			case <-c.Request().Context().Done():
-				return
-			}
-		}
-	}()
-
-	session.peerConn, session.audioTrack, err = createPeerConnection(h.cfg)
+	peerConn, audioTrack, err := createPeerConnection(h.cfg)
 	if err != nil {
 		slog.Error("create peer connection", slog.Any(constant.Error, err))
 
 		return nil
 	}
 
-	defer func() {
-		if session.room != nil {
-			if len(session.room.sessions) == 0 {
-				h.roomManager.Remove(session.room.id)
-			} else {
-				session.room.RemoveSession(session.id)
-			}
-		}
-		session.peerConn.Close()
-	}()
+	session.SetPeerConnection(peerConn)
+	session.SetAudioTrack(audioTrack)
 
 	// TODO: вынести все хендлеры для peerConnection в пакет signaling
 	session.peerConn.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
@@ -335,15 +284,8 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 	}
 }
 
-// IsConnectionClosed проверяет, закрыто ли соединение
-func IsConnectionClosed(err error) bool {
-	return websocket.IsCloseError(err) ||
-		websocket.IsUnexpectedCloseError(err) ||
-		strings.Contains(err.Error(), "use of closed network connection")
-}
-
 func (h *HttpHandler) handleMessage(
-	session *Session,
+	session *signaling.Session,
 	msg *signaling.Message,
 ) error {
 	switch msg.Type {
@@ -359,17 +301,15 @@ func (h *HttpHandler) handleMessage(
 		}
 
 		if joinEvent.RoomID == "" {
-			session.WriteWS(map[string]interface{}{"type": constant.Error, "message": "room_id is required"})
 			return errors.New("room_id is required")
 		}
 
-		session.name = joinEvent.Name
+		session.Name = joinEvent.Name
+		session.RoomID = joinEvent.RoomID
 
 		room := h.roomManager.GetOrCreate(joinEvent.RoomID)
 
 		room.AddSession(session)
-
-		session.room = room
 
 	case "offer":
 		var offer signaling.SdpEvent
@@ -419,7 +359,7 @@ func (h *HttpHandler) handleMessage(
 		}
 
 	case "candidate":
-		var candidate signaling.CandidateEvent
+		var candidate signaling.IceCandidateEvent
 
 		if err := json.Unmarshal(msg.Data, &candidate); err != nil {
 			return err
@@ -503,12 +443,13 @@ func main() {
 	defer dbConn.Close()
 
 	userRepo := repository.NewUserRepo(dbConn)
+	roomRepo := signaling.NewInMemoryRoomRepository()
 
 	slog.Info("Running app", slog.Bool("debug", cfg.Debug))
 
-	httpHandler := NewHttpHandler(
+	signalingHandler := signaling.NewSignalingHandler(
 		cfg,
-		NewRoomManager(),
+		roomRepo,
 		&websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				if cfg.Debug {
@@ -517,18 +458,25 @@ func main() {
 
 				return r.Header.Get("Origin") == cfg.Domain
 			},
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			EnableCompression: true,
 		},
-		userRepo,
 	)
+
+	userHandler := user.NewUserHandler(userRepo)
 
 	e := echo.New()
 
 	e.Use(middleware.SlogLogger())
 
 	e.Static("/", "web")
-	e.GET("/ws", httpHandler.handleWebSocket)
 
-	e.GET("/ice", httpHandler.iceServersHandler)
+	e.GET("/ws", signalingHandler.HandleWebSocket)
+
+	e.GET("/ice", signalingHandler.IceServersHandler)
+
+	e.POST("/users", userHandler.CreateUser)
 
 	err = e.Start(":3000")
 	if err != nil {
