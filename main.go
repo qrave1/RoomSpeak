@@ -20,11 +20,11 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
-	"github.com/qrave1/RoomSpeak/internal/middleware"
-	"github.com/qrave1/RoomSpeak/internal/signaling"
 
 	"github.com/qrave1/RoomSpeak/internal/config"
 	"github.com/qrave1/RoomSpeak/internal/constant"
+	"github.com/qrave1/RoomSpeak/internal/middleware"
+	"github.com/qrave1/RoomSpeak/internal/signaling"
 )
 
 type RoomManager struct {
@@ -74,13 +74,6 @@ func NewRoom(id string) *Room {
 }
 
 func (r *Room) AddSession(c *Session) {
-	slog.Info(
-		"Session joined room",
-		slog.String(constant.SessionID, c.id),
-		slog.String(constant.SessionName, c.name),
-		slog.String(constant.RoomID, r.id),
-	)
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -92,12 +85,6 @@ func (r *Room) AddSession(c *Session) {
 func (r *Room) RemoveSession(sessionID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	slog.Info(
-		"Session left room",
-		slog.String(constant.SessionID, sessionID),
-		slog.String(constant.RoomID, r.id),
-	)
 
 	delete(r.sessions, sessionID)
 
@@ -358,7 +345,7 @@ func (h *HttpHandler) handleMessage(
 
 		if joinEvent.RoomID == "" {
 			session.WriteWS(map[string]interface{}{"type": constant.Error, "message": "room_id is required"})
-			return errors.New("room_id is required")
+			return nil
 		}
 
 		session.name = joinEvent.Name
@@ -417,7 +404,7 @@ func (h *HttpHandler) handleMessage(
 		}
 
 	case "candidate":
-		var candidate signaling.CandidateEvent
+		var candidate signaling.IceCandidateEvent
 
 		if err := json.Unmarshal(msg.Data, &candidate); err != nil {
 			return err
