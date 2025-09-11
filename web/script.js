@@ -18,6 +18,9 @@ function app() {
         participants: [],
         remoteAudioElements: [],
 
+        showDeleteModal: false,
+        channelToDelete: '',
+
         async init() {
             await this.getAudioDevices();
             // Обновляем список устройств при изменении
@@ -25,61 +28,6 @@ function app() {
 
             await this.initializeWebSocket();
             await this.getChannels();
-        },
-
-        async getChannels() {
-            try {
-                const response = await fetch('/api/channels');
-                this.channels = await response.json();
-            } catch (err) {
-                console.error('Error getting channels:', err);
-            }
-        },
-
-        async createChannel() {
-            if (!this.newChannelName.trim()) {
-                return;
-            }
-
-            try {
-                await fetch('/api/channels', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({channel_id: this.newChannelName})
-                });
-                this.newChannelName = '';
-                await this.getChannels();
-            } catch (err) {
-                console.error('Error creating channel:', err);
-            }
-        },
-
-        showDeleteModal: false,
-        channelToDelete: '',
-
-        async deleteChannel(channel) {
-            this.channelToDelete = channel;
-            this.showDeleteModal = true;
-        },
-
-        async confirmDelete() {
-            try {
-                await fetch(`/api/channels/${this.channelToDelete}`, {
-                    method: 'DELETE'
-                });
-                await this.getChannels();
-            } catch (err) {
-                console.error('Error deleting channel:', err);
-            }
-            this.showDeleteModal = false;
-            this.channelToDelete = '';
-        },
-
-        async joinChannel(channel) {
-            this.currentChannel = channel;
-            await this.connect();
         },
 
         async getAudioDevices() {
@@ -138,6 +86,57 @@ function app() {
             }
         },
 
+        async getChannels() {
+            try {
+                const response = await fetch('/api/channels');
+                this.channels = await response.json();
+            } catch (err) {
+                console.error('Error getting channels:', err);
+            }
+        },
+
+        async createChannel() {
+            if (!this.newChannelName.trim()) {
+                return;
+            }
+
+            try {
+                await fetch('/api/channels', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({channel_id: this.newChannelName})
+                });
+                this.newChannelName = '';
+                await this.getChannels();
+            } catch (err) {
+                console.error('Error creating channel:', err);
+            }
+        },
+
+        deleteChannel(channel) {
+            this.channelToDelete = channel;
+            this.showDeleteModal = true;
+        },
+
+        async confirmDelete() {
+            try {
+                await fetch(`/api/channels/${this.channelToDelete}`, {
+                    method: 'DELETE'
+                });
+                await this.getChannels();
+            } catch (err) {
+                console.error('Error deleting channel:', err);
+            }
+            this.showDeleteModal = false;
+            this.channelToDelete = '';
+        },
+
+        async joinChannel(channel) {
+            this.currentChannel = channel;
+            await this.connect();
+        },
 
         async connect() {
             if (!this.name.trim()) {

@@ -26,10 +26,12 @@
                 <li class="flex items-center justify-between bg-gray-700 p-2 rounded">
                     <span x-text="channel"></span>
                     <div>
-                        <button @click="joinChannel(channel)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded">
+                        <button @click="joinChannel(channel)"
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded">
                             <i class="fas fa-sign-in-alt"></i>
                         </button>
-                        <button @click="deleteChannel(channel)" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded ml-2">
+                        <button @click="deleteChannel(channel)"
+                                class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded ml-2">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -39,19 +41,47 @@
         <div class="mt-4">
             <h3 class="text-xl font-bold mb-2">Your Name</h3>
             <div class="relative">
-                <input type="text" x-model="name" placeholder="Your Name" class="pl-10 pr-4 py-2 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <input type="text" x-model="name" placeholder="Your Name"
+                       class="pl-10 pr-4 py-2 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                 <i class="fas fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
             </div>
         </div>
         <div class="mt-4">
             <h3 class="text-xl font-bold mb-2">Create Channel</h3>
             <div class="relative">
-                <input type="text" x-model="newChannelName" placeholder="Channel Name" class="pl-10 pr-4 py-2 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <input type="text" x-model="newChannelName" placeholder="Channel Name"
+                       class="pl-10 pr-4 py-2 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                 <i class="fas fa-plus absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
             </div>
-            <button @click="createChannel()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-2">
+            <button @click="createChannel()"
+                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-2">
                 Create
             </button>
+        </div>
+
+        <!-- Settings -->
+        <div class="mt-4 border-t border-gray-700 pt-4">
+            <h3 class="text-xl font-bold mb-2">Settings</h3>
+            <div class="space-y-2">
+                <div>
+                    <label for="audio-input" class="block text-sm font-medium text-gray-400">Audio Input</label>
+                    <select id="audio-input" x-model="selectedInputDevice" @change="updateAudioDevices()"
+                            class="mt-1 block w-full pl-3 pr-10 py-2 bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <template x-for="device in audioInputDevices">
+                            <option :value="device.deviceId" x-text="device.label"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label for="audio-output" class="block text-sm font-medium text-gray-400">Audio Output</label>
+                    <select id="audio-output" x-model="selectedOutputDevice" @change="updateOutputDevice()"
+                            class="mt-1 block w-full pl-3 pr-10 py-2 bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <template x-for="device in audioOutputDevices">
+                            <option :value="device.deviceId" x-text="device.label"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -72,7 +102,8 @@
                     </li>
                 </template>
             </ul>
-            <button @click="disconnect()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mt-4">
+            <button @click="disconnect()"
+                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mt-4">
                 <i class="fas fa-phone-slash mr-2"></i>
                 Disconnect
             </button>
@@ -81,15 +112,18 @@
 </div>
 
 <!-- Modal -->
-<div x-show="showDeleteModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center" style="display: none;">
+<div x-show="showDeleteModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center"
+     style="display: none;">
     <div class="bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-sm">
         <h3 class="text-xl font-bold mb-4">Delete Channel</h3>
         <p>Are you sure you want to delete the channel "<span x-text="channelToDelete"></span>"?</p>
         <div class="mt-6 flex justify-end space-x-4">
-            <button @click="showDeleteModal = false" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+            <button @click="showDeleteModal = false"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                 Cancel
             </button>
-            <button @click="confirmDelete()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+            <button @click="confirmDelete()"
+                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
                 Delete
             </button>
         </div>
