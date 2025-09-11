@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
@@ -20,10 +21,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
+	"github.com/qrave1/RoomSpeak/internal/infrastructure/postgres"
 
 	"github.com/qrave1/RoomSpeak/internal/config"
 	"github.com/qrave1/RoomSpeak/internal/constant"
-	"github.com/qrave1/RoomSpeak/internal/db"
 	"github.com/qrave1/RoomSpeak/internal/middleware"
 	"github.com/qrave1/RoomSpeak/internal/signaling"
 )
@@ -509,6 +510,8 @@ func NewHttpHandler(
 }
 
 func main() {
+	ctx := context.Background()
+
 	slog.SetDefault(
 		slog.New(
 			slog.NewJSONHandler(
@@ -526,7 +529,7 @@ func main() {
 
 	slog.Info("Running app", slog.Bool("debug", cfg.Debug))
 
-	dbConn, err := db.NewPostgres(cfg.PostgresURL)
+	dbConn, err := postgres.NewPostgres(ctx, cfg.PostgresURL)
 	if err != nil {
 		slog.Error("connect to postgres", slog.Any(constant.Error, err))
 		os.Exit(1)
