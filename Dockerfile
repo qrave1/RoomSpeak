@@ -19,4 +19,4 @@ WORKDIR /app
 COPY --from=builder /app/build .
 COPY --from=builder /app/web ./web
 
-ENTRYPOINT ["./build"]
+CMD ["./build"]

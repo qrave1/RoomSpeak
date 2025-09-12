@@ -2,10 +2,14 @@ networks:
   traefik:
     driver: bridge
 
+volumes:
+  roomspeak_pg_data:
+
 services:
   traefik:
     image: traefik:v3.5.1
     container_name: traefik
+    profiles: [ deploy ]
     restart: always
     command:
       - --configFile=/etc/traefik/traefik.yml
@@ -30,6 +34,7 @@ services:
   roomspeak:
     image: ghcr.io/qrave1/roomspeak:latest
     container_name: roomspeak-backend
+    profiles: [ app ]
     restart: always
     env_file: .env
     networks:
@@ -41,9 +46,34 @@ services:
       - "traefik.http.routers.app.tls.certresolver=myresolver"
       - "traefik.http.services.app.loadbalancer.server.port=3000"
 
+  migrate:
+    image: ghcr.io/qrave1/roomspeak:latest
+    container_name: migrate
+    command: [ "./build", "migrate", "up" ]
+    profiles: [ migrate ]
+    restart: no
+    env_file: .env
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: roomspeak-postgres
+    profiles: [ infra ]
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=roomspeak
+    volumes:
+      - roomspeak_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - default
+  
   coturn:
     image: coturn/coturn:4.7-alpine
     container_name: coturn
+    profiles: [ coturn ]
     command: [ "-c", "/etc/coturn/coturn.conf" ]
     restart: unless-stopped
     network_mode: "host"

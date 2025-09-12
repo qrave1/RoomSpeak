@@ -8,14 +8,42 @@ import (
 )
 
 type Config struct {
-	Debug  bool   `env:"DEBUG" envDefault:"false"`
-	Port   string `env:"PORT" envDefault:"3000"`
-	Domain string `env:"DOMAIN" envDefault:"https://xxsm.ru"`
+	Debug     bool   `env:"DEBUG" envDefault:"false"`
+	Port      string `env:"PORT" envDefault:"3000"`
+	Domain    string `env:"DOMAIN" envDefault:"https://xxsm.ru"`
+	JWTSecret string `env:"JWT_SECRET,required"`
 
 	TurnUDPServer webrtc.ICEServer
 	TurnTCPServer webrtc.ICEServer
 
 	CoturnServer CoturnConfig
+	Postgres     PostgresConfig
+}
+
+type PostgresConfig struct {
+	URL string `env:"POSTGRES_URL"`
+
+	Host     string `env:"POSTGRES_HOST" envDefault:"localhost"`
+	Port     int    `env:"POSTGRES_PORT" envDefault:"5432"`
+	User     string `env:"POSTGRES_USER" envDefault:"postgres"`
+	Password string `env:"POSTGRES_PASSWORD" envDefault:"postgres"`
+	Name     string `env:"POSTGRES_NAME" envDefault:"roomspeak"`
+	SSL      string `env:"POSTGRES_SSL" envDefault:"disable"`
+}
+
+func (p *PostgresConfig) DSN() string {
+	if p.URL != "" {
+		return p.URL
+	}
+
+	return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=%s",
+		p.User,
+		p.Password,
+		p.Host,
+		p.Port,
+		p.Name,
+		p.SSL,
+	)
 }
 
 type CoturnConfig struct {

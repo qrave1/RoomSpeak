@@ -18,68 +18,91 @@ function app() {
         participants: [],
         remoteAudioElements: [],
 
+        showDeleteModal: false,
+        channelToDelete: '',
+
+        isAuthenticated: false,
+        showLogin: true,
+        auth: {
+            username: '',
+            password: ''
+        },
+
         async init() {
-            await this.getAudioDevices();
-            // Обновляем список устройств при изменении
-            navigator.mediaDevices.addEventListener('devicechange', () => this.getAudioDevices());
+            await this.checkAuth();
+            if (this.isAuthenticated) {
+                await this.getAudioDevices();
+                // Обновляем список устройств при изменении
+                navigator.mediaDevices.addEventListener('devicechange', () => this.getAudioDevices());
 
-            await this.initializeWebSocket();
-            await this.getChannels();
+                await this.initializeWebSocket();
+                await this.getChannels();
+            }
         },
 
-        async getChannels() {
+        async checkAuth() {
             try {
-                const response = await fetch('/api/channels');
-                this.channels = await response.json();
+                const response = await fetch('/api/v1/me');
+                if (response.ok) {
+                    this.isAuthenticated = true;
+                    const user = await response.json();
+                    this.name = user.username;
+                } else {
+                    this.isAuthenticated = false;
+                }
             } catch (err) {
-                console.error('Error getting channels:', err);
+                this.isAuthenticated = false;
             }
         },
 
-        async createChannel() {
-            if (!this.newChannelName.trim()) {
-                return;
-            }
-
+        async login() {
             try {
-                await fetch('/api/channels', {
+                const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({channel_id: this.newChannelName})
+                    body: JSON.stringify(this.auth)
                 });
-                this.newChannelName = '';
-                await this.getChannels();
+
+                if (response.ok) {
+                    this.isAuthenticated = true;
+                    window.location.reload();
+                } else {
+                    alert('Login failed');
+                }
             } catch (err) {
-                console.error('Error creating channel:', err);
+                console.error('Login error:', err);
+                alert('Login error');
             }
         },
 
-        showDeleteModal: false,
-        channelToDelete: '',
-
-        async deleteChannel(channel) {
-            this.channelToDelete = channel;
-            this.showDeleteModal = true;
-        },
-
-        async confirmDelete() {
+        async register() {
             try {
-                await fetch(`/api/channels/${this.channelToDelete}`, {
-                    method: 'DELETE'
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(this.auth)
                 });
-                await this.getChannels();
+
+                if (response.ok) {
+                    alert('Registration successful, please login');
+                    this.showLogin = true;
+                } else {
+                    alert('Registration failed');
+                }
             } catch (err) {
-                console.error('Error deleting channel:', err);
+                console.error('Registration error:', err);
+                alert('Registration error');
             }
-            this.showDeleteModal = false;
-            this.channelToDelete = '';
         },
 
-        async joinChannel(channel) {
-            this.currentChannel = channel;
-            await this.connect();
+        logout() {
+            document.cookie = 'jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            this.isAuthenticated = false;
+            window.location.reload();
         },
 
         async getAudioDevices() {
@@ -138,6 +161,57 @@ function app() {
             }
         },
 
+        async getChannels() {
+            try {
+                const response = await fetch('/api/v1/channels');
+                this.channels = await response.json();
+            } catch (err) {
+                console.error('Error getting channels:', err);
+            }
+        },
+
+        async createChannel() {
+            if (!this.newChannelName.trim()) {
+                return;
+            }
+
+            try {
+                await fetch('/api/v1/channels', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({channel_id: this.newChannelName})
+                });
+                this.newChannelName = '';
+                await this.getChannels();
+            } catch (err) {
+                console.error('Error creating channel:', err);
+            }
+        },
+
+        deleteChannel(channel) {
+            this.channelToDelete = channel;
+            this.showDeleteModal = true;
+        },
+
+        async confirmDelete() {
+            try {
+                await fetch(`/api/v1/channels/${this.channelToDelete}`, {
+                    method: 'DELETE'
+                });
+                await this.getChannels();
+            } catch (err) {
+                console.error('Error deleting channel:', err);
+            }
+            this.showDeleteModal = false;
+            this.channelToDelete = '';
+        },
+
+        async joinChannel(channel) {
+            this.currentChannel = channel;
+            await this.connect();
+        },
 
         async connect() {
             if (!this.name.trim()) {
