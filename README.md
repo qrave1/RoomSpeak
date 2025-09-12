@@ -5,7 +5,8 @@
 ### Tech List
 
 - [ ] Github CI/CD
-- [ ] Grafana
+- [ ] Prometheus Metrics
+- [ ] Grafana + TG Alerts
 - [x] TURN servers API
 
 ### Features List
@@ -13,9 +14,11 @@
 - [x] Basic WebRTC Voice Chat
 - [x] Frontend UI/UX Redesign
 - [ ] User Authentication + RBAC
-- [ ] Room Creation and Management
+- [ ] Channel Creation and Management
+- [ ] Mute / Unmute + channel notifying
 - [ ] Voice activity detection via WebRTC Data Channels
-- [ ] Room messaging via WebRTC Data Channels
+- [ ] Channel messaging via WebRTC Data Channels
+- [ ] Frontend for mobile
 
 ## Docker
 
