@@ -46,6 +46,13 @@ services:
       - "traefik.http.routers.app.tls.certresolver=myresolver"
       - "traefik.http.services.app.loadbalancer.server.port=3000"
 
+  migrate:
+    image: ghcr.io/qrave1/roomspeak:latest
+    container_name: migrate
+    profiles: [ migrate ]
+    restart: no
+    env_file: .env
+
   postgres:
     image: postgres:17-alpine
     container_name: roomspeak-postgres
