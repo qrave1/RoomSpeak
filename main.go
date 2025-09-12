@@ -529,7 +529,7 @@ func main() {
 
 	slog.Info("Running app", slog.Bool("debug", cfg.Debug))
 
-	dbConn, err := postgres.NewPostgres(ctx, cfg.PostgresURL)
+	dbConn, err := postgres.NewPostgres(ctx, cfg.Postgres.DSN())
 	if err != nil {
 		slog.Error("connect to postgres", slog.Any(constant.Error, err))
 		os.Exit(1)
