@@ -556,9 +556,11 @@ func main() {
 	e.Use(middleware.SlogLogger())
 
 	api := e.Group("/api")
-	api.GET("/channels", httpHandler.listChannelsHandler)
-	api.POST("/channels", httpHandler.createChannelHandler)
-	api.DELETE("/channels/:id", httpHandler.deleteChannelHandler)
+	{
+		api.GET("/channels", httpHandler.listChannelsHandler)
+		api.POST("/channels", httpHandler.createChannelHandler)
+		api.DELETE("/channels/:id", httpHandler.deleteChannelHandler)
+	}
 
 	e.Static("/", "web")
 	e.GET("/ws", httpHandler.handleWebSocket)

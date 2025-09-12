@@ -4,6 +4,7 @@ dotenv: [ ".env" ]
 
 vars:
   REGISTRY: "ghcr.io/qrave1/roomspeak"
+  COMPOSE_FILE: deploy/docker-compose.yml
   BUILD_TIMESTAMP:
     sh: date +%Y_%m_%d_%H_%M_%S
 
@@ -26,6 +27,7 @@ tasks:
     deps: [ push ]
   #    cmds: TODO
 
+  # Migrations
   migrate:
     desc: Manage database migrations
     cmds:
@@ -43,3 +45,9 @@ tasks:
     cmds:
       - goose create {{.CLI_ARGS}} sql
 
+  # Docker Compose
+  infra:
+    desc: Run Infrastructure
+    cmds:
+      - echo "Start dev environment"
+      - docker compose --file {{.COMPOSE_FILE}} --profile infra up -d
