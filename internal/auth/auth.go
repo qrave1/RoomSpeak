@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/qrave1/RoomSpeak/internal/constant"
-	"github.com/qrave1/RoomSpeak/internal/infrastructure/postgres/repository"
+	"github.com/qrave1/RoomSpeak/internal/infra/postgres/repository"
 	"github.com/qrave1/RoomSpeak/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )

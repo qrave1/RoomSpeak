@@ -35,13 +35,13 @@ tasks:
 
   migrate:up:
     desc: Run goose migrations
-    dir: internal/infrastructure/postgres/migrations
+    dir: internal/infra/postgres/migrations
     cmds:
-      - goose postgres "user={{.POSTGRES_USER}} password={{.POSTGRES_PASSWORD}} dbname={{.POSTGRES_DB}} host={{.POSTGRES_HOST}} port={{.POSTGRES_PORT}} sslmode=disable" up
+      - goose postgres "user={{.POSTGRES_USER}} password={{.POSTGRES_PASSWORD}} dbname={{.POSTGRES_DB}} host={{.POSTGRES_HOST}} port={{.POSTGRES_PORT}} sslmode=require" up
 
   migrate:create:
     desc: Create a new goose migration
-    dir: internal/infrastructure/postgres/migrations
+    dir: internal/infra/postgres/migrations
     cmds:
       - goose create {{.CLI_ARGS}} sql
 

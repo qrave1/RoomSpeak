@@ -21,6 +21,8 @@ type Config struct {
 }
 
 type PostgresConfig struct {
+	URL string `env:"POSTGRES_URL"`
+
 	Host     string `env:"POSTGRES_HOST" envDefault:"localhost"`
 	Port     int    `env:"POSTGRES_PORT" envDefault:"5432"`
 	User     string `env:"POSTGRES_USER" envDefault:"postgres"`
@@ -30,7 +32,11 @@ type PostgresConfig struct {
 }
 
 func (p *PostgresConfig) DSN() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+	if p.URL != "" {
+		return p.URL
+	}
+
+	return fmt.Sprintf("postgresql://%s:%s@%s:%d/%s?sslmode=%s",
 		p.User,
 		p.Password,
 		p.Host,
