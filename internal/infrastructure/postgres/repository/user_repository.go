@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
@@ -8,9 +10,9 @@ import (
 )
 
 type UserRepository interface {
-	CreateUser(user models.User) (uuid.UUID, error)
-	GetUserByID(id uuid.UUID) (models.User, error)
-	GetUserByUsername(username string) (models.User, error)
+	CreateUser(user *models.User) error
+	GetUserByID(id uuid.UUID) (*models.User, error)
+	GetUserByUsername(username string) (*models.User, error)
 }
 
 type userRepo struct {
@@ -21,32 +23,43 @@ func NewUserRepo(db *sqlx.DB) UserRepository {
 	return &userRepo{db: db}
 }
 
-func (r *userRepo) CreateUser(user models.User) (uuid.UUID, error) {
-	var id uuid.UUID
-	query := "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id"
-	err := r.db.QueryRow(query, user.Username, user.Password).Scan(&id)
+func (r *userRepo) CreateUser(user *models.User) error {
+	query := "INSERT INTO users (username, password) VALUES ($1, $2)"
+
+	res, err := r.db.Exec(query, user.Username, user.Password)
 	if err != nil {
-		return uuid.Nil, err
+		return fmt.Errorf("create user: %w", err)
 	}
-	return id, nil
+
+	if aff, err := res.RowsAffected(); aff == 0 || err != nil {
+		return fmt.Errorf("create user no rows affected: %w", err)
+	}
+
+	return nil
 }
 
-func (r *userRepo) GetUserByID(id uuid.UUID) (models.User, error) {
-	var user models.User
+func (r *userRepo) GetUserByID(id uuid.UUID) (*models.User, error) {
+	var user *models.User
+
 	query := "SELECT id, username, password, created_at FROM users WHERE id = $1"
+
 	err := r.db.Get(&user, query, id)
 	if err != nil {
-		return models.User{}, err
+		return nil, err
 	}
+
 	return user, nil
 }
 
-func (r *userRepo) GetUserByUsername(username string) (models.User, error) {
-	var user models.User
+func (r *userRepo) GetUserByUsername(username string) (*models.User, error) {
+	var user *models.User
+
 	query := "SELECT id, username, password, created_at FROM users WHERE username = $1"
+
 	err := r.db.Get(&user, query, username)
 	if err != nil {
-		return models.User{}, err
+		return nil, err
 	}
+
 	return user, nil
 }

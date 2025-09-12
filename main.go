@@ -21,10 +21,11 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
-	"github.com/qrave1/RoomSpeak/internal/infrastructure/postgres"
-
+	"github.com/qrave1/RoomSpeak/internal/auth"
 	"github.com/qrave1/RoomSpeak/internal/config"
 	"github.com/qrave1/RoomSpeak/internal/constant"
+	"github.com/qrave1/RoomSpeak/internal/infrastructure/postgres"
+	"github.com/qrave1/RoomSpeak/internal/infrastructure/postgres/repository"
 	"github.com/qrave1/RoomSpeak/internal/middleware"
 	"github.com/qrave1/RoomSpeak/internal/signaling"
 )
@@ -536,6 +537,9 @@ func main() {
 	}
 	defer dbConn.Close()
 
+	userRepo := repository.NewUserRepo(dbConn)
+	authHandler := auth.NewAuthHandler(userRepo, cfg.JWTSecret)
+
 	httpHandler := NewHttpHandler(
 		cfg,
 		NewChannelManager(),
@@ -557,9 +561,19 @@ func main() {
 
 	api := e.Group("/api")
 	{
-		api.GET("/channels", httpHandler.listChannelsHandler)
-		api.POST("/channels", httpHandler.createChannelHandler)
-		api.DELETE("/channels/:id", httpHandler.deleteChannelHandler)
+		authGroup := api.Group("/auth")
+		{
+			authGroup.POST("/register", authHandler.Register)
+			authGroup.POST("/login", authHandler.Login)
+		}
+
+		v1 := api.Group("/v1")
+		v1.Use(middleware.JWTAuthMiddleware(cfg.JWTSecret))
+		{
+			v1.GET("/channels", httpHandler.listChannelsHandler)
+			v1.POST("/channels", httpHandler.createChannelHandler)
+			v1.DELETE("/channels/:id", httpHandler.deleteChannelHandler)
+		}
 	}
 
 	e.Static("/", "web")
