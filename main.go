@@ -570,6 +570,7 @@ func main() {
 		v1 := api.Group("/v1")
 		v1.Use(middleware.JWTAuthMiddleware(cfg.JWTSecret))
 		{
+			v1.GET("/me", authHandler.GetMe)
 			v1.GET("/channels", httpHandler.listChannelsHandler)
 			v1.POST("/channels", httpHandler.createChannelHandler)
 			v1.DELETE("/channels/:id", httpHandler.deleteChannelHandler)

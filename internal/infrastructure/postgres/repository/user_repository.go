@@ -39,7 +39,7 @@ func (r *userRepo) CreateUser(user *models.User) error {
 }
 
 func (r *userRepo) GetUserByID(id uuid.UUID) (*models.User, error) {
-	var user *models.User
+	var user models.User
 
 	query := "SELECT id, username, password, created_at FROM users WHERE id = $1"
 
@@ -48,11 +48,11 @@ func (r *userRepo) GetUserByID(id uuid.UUID) (*models.User, error) {
 		return nil, err
 	}
 
-	return user, nil
+	return &user, nil
 }
 
 func (r *userRepo) GetUserByUsername(username string) (*models.User, error) {
-	var user *models.User
+	var user models.User
 
 	query := "SELECT id, username, password, created_at FROM users WHERE username = $1"
 
@@ -61,5 +61,5 @@ func (r *userRepo) GetUserByUsername(username string) (*models.User, error) {
 		return nil, err
 	}
 
-	return user, nil
+	return &user, nil
 }

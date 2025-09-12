@@ -21,13 +21,88 @@ function app() {
         showDeleteModal: false,
         channelToDelete: '',
 
-        async init() {
-            await this.getAudioDevices();
-            // Обновляем список устройств при изменении
-            navigator.mediaDevices.addEventListener('devicechange', () => this.getAudioDevices());
+        isAuthenticated: false,
+        showLogin: true,
+        auth: {
+            username: '',
+            password: ''
+        },
 
-            await this.initializeWebSocket();
-            await this.getChannels();
+        async init() {
+            await this.checkAuth();
+            if (this.isAuthenticated) {
+                await this.getAudioDevices();
+                // Обновляем список устройств при изменении
+                navigator.mediaDevices.addEventListener('devicechange', () => this.getAudioDevices());
+
+                await this.initializeWebSocket();
+                await this.getChannels();
+            }
+        },
+
+        async checkAuth() {
+            try {
+                const response = await fetch('/api/v1/me');
+                if (response.ok) {
+                    this.isAuthenticated = true;
+                    const user = await response.json();
+                    this.name = user.username;
+                } else {
+                    this.isAuthenticated = false;
+                }
+            } catch (err) {
+                this.isAuthenticated = false;
+            }
+        },
+
+        async login() {
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(this.auth)
+                });
+
+                if (response.ok) {
+                    this.isAuthenticated = true;
+                    window.location.reload();
+                } else {
+                    alert('Login failed');
+                }
+            } catch (err) {
+                console.error('Login error:', err);
+                alert('Login error');
+            }
+        },
+
+        async register() {
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(this.auth)
+                });
+
+                if (response.ok) {
+                    alert('Registration successful, please login');
+                    this.showLogin = true;
+                } else {
+                    alert('Registration failed');
+                }
+            } catch (err) {
+                console.error('Registration error:', err);
+                alert('Registration error');
+            }
+        },
+
+        logout() {
+            document.cookie = 'jwt=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            this.isAuthenticated = false;
+            window.location.reload();
         },
 
         async getAudioDevices() {
@@ -88,7 +163,7 @@ function app() {
 
         async getChannels() {
             try {
-                const response = await fetch('/api/channels');
+                const response = await fetch('/api/v1/channels');
                 this.channels = await response.json();
             } catch (err) {
                 console.error('Error getting channels:', err);
@@ -101,7 +176,7 @@ function app() {
             }
 
             try {
-                await fetch('/api/channels', {
+                await fetch('/api/v1/channels', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -122,7 +197,7 @@ function app() {
 
         async confirmDelete() {
             try {
-                await fetch(`/api/channels/${this.channelToDelete}`, {
+                await fetch(`/api/v1/channels/${this.channelToDelete}`, {
                     method: 'DELETE'
                 });
                 await this.getChannels();

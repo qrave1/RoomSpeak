@@ -3,7 +3,8 @@ package constant
 const (
 	Error = "error"
 
-	UserID = "user_id"
+	UserID   = "user_id"
+	UserName = "username"
 
 	SessionID   = "session_id"
 	SessionName = "session_name"
