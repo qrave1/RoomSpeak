@@ -1,5 +1,7 @@
 version: '3'
 
+dotenv: [ ".env" ]
+
 vars:
   REGISTRY: "ghcr.io/qrave1/roomspeak"
   BUILD_TIMESTAMP:
@@ -22,5 +24,22 @@ tasks:
   deploy:
     desc: Build, push, update deployment.yaml and apply
     deps: [ push ]
+  #    cmds: TODO
+
+  migrate:
+    desc: Manage database migrations
     cmds:
+      - task --list | grep migrate
+
+  migrate:up:
+    desc: Run goose migrations
+    dir: internal/infrastructure/postgres/migrations
+    cmds:
+      - goose postgres "user={{.POSTGRES_USER}} password={{.POSTGRES_PASSWORD}} dbname={{.POSTGRES_DB}} host={{.POSTGRES_HOST}} port={{.POSTGRES_PORT}} sslmode=disable" up
+
+  migrate:create:
+    desc: Create a new goose migration
+    dir: internal/infrastructure/postgres/migrations
+    cmds:
+      - goose create {{.CLI_ARGS}} sql
 
