@@ -41,7 +41,7 @@ func (r *userRepo) CreateUser(user *models.User) error {
 func (r *userRepo) GetUserByID(id uuid.UUID) (*models.User, error) {
 	var user models.User
 
-	query := "SELECT id, username, password, created_at FROM users WHERE id = $1"
+	query := "SELECT id, username, password, created_at, updated_at FROM users WHERE id = $1"
 
 	err := r.db.Get(&user, query, id)
 	if err != nil {
@@ -54,7 +54,7 @@ func (r *userRepo) GetUserByID(id uuid.UUID) (*models.User, error) {
 func (r *userRepo) GetUserByUsername(username string) (*models.User, error) {
 	var user models.User
 
-	query := "SELECT id, username, password, created_at FROM users WHERE username = $1"
+	query := "SELECT id, username, password, created_at, updated_at FROM users WHERE username = $1"
 
 	err := r.db.Get(&user, query, username)
 	if err != nil {

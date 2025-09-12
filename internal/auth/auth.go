@@ -90,11 +90,12 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	c.SetCookie(&http.Cookie{
-		Name:    "jwt",
-		Value:   ss,
-		Expires: time.Now().Add(time.Hour * 72),
-		//Secure:   true,
-		//HttpOnly: true,
+		Name:     "jwt",
+		Value:    ss,
+		Expires:  time.Now().Add(time.Hour * 72),
+		Path:     "/",
+		Secure:   true,
+		HttpOnly: true,
 	})
 
 	return c.NoContent(http.StatusOK)
@@ -116,6 +117,15 @@ func (h *AuthHandler) GetMe(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "user not found"})
 	}
 
-	user.Password = ""
-	return c.JSON(http.StatusOK, user)
+	resp := GetMeResponse{
+		ID:       user.ID,
+		Username: user.Username,
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+type GetMeResponse struct {
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
 }
