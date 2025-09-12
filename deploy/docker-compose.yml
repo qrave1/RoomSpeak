@@ -49,6 +49,7 @@ services:
   migrate:
     image: ghcr.io/qrave1/roomspeak:latest
     container_name: migrate
+    command: [ "./build", "migrate", "up" ]
     profiles: [ migrate ]
     restart: no
     env_file: .env
