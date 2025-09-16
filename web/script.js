@@ -304,6 +304,8 @@ function app() {
                 if (event.track.kind === 'audio') {
                     const audio = new Audio();
                     audio.srcObject = event.streams[0];
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
 
                     // Устанавливаем выбранное устройство вывода
                     if (this.selectedOutputDevice && 'setSinkId' in audio) {
@@ -313,7 +315,7 @@ function app() {
 
                     this.remoteAudioElements.push(audio);
 
-                    audio.play();
+                    audio.play().catch(err => console.error('Failed to play remote audio:', err));
                 }
             };
 
@@ -391,7 +393,9 @@ function app() {
             }
 
             for (const audio of this.remoteAudioElements) {
+                audio.pause();
                 audio.srcObject = null;
+                audio.remove();
             }
             this.remoteAudioElements = [];
             this.currentChannel = '';
