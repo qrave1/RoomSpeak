@@ -21,13 +21,14 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
+
 	"github.com/qrave1/RoomSpeak/internal/auth"
 	"github.com/qrave1/RoomSpeak/internal/config"
 	"github.com/qrave1/RoomSpeak/internal/constant"
+	"github.com/qrave1/RoomSpeak/internal/domain/events"
+	"github.com/qrave1/RoomSpeak/internal/infra/http/middleware"
 	"github.com/qrave1/RoomSpeak/internal/infra/postgres"
 	"github.com/qrave1/RoomSpeak/internal/infra/postgres/repository"
-	"github.com/qrave1/RoomSpeak/internal/middleware"
-	"github.com/qrave1/RoomSpeak/internal/signaling"
 )
 
 func runApp() {
@@ -350,7 +351,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 				return nil
 			}
 
-			signalMessage := new(signaling.Message)
+			signalMessage := new(events.Message)
 
 			if err = json.Unmarshal(msg, &signalMessage); err != nil {
 				slog.Error("unmarshal websocket message", slog.Any(constant.Error, err))
@@ -367,11 +368,11 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 
 func (h *HttpHandler) handleMessage(
 	session *Session,
-	msg *signaling.Message,
+	msg *events.Message,
 ) error {
 	switch msg.Type {
 	case "join":
-		var joinEvent signaling.JoinEvent
+		var joinEvent events.JoinEvent
 
 		if err := json.Unmarshal(msg.Data, &joinEvent); err != nil {
 			return err
@@ -448,7 +449,7 @@ func (h *HttpHandler) handleMessage(
 		})
 
 	case "offer":
-		var offer signaling.SdpEvent
+		var offer events.SdpEvent
 
 		if err := json.Unmarshal(msg.Data, &offer); err != nil {
 			return err
@@ -477,7 +478,7 @@ func (h *HttpHandler) handleMessage(
 		return session.WriteWS(map[string]interface{}{"type": "answer", "sdp": answer.SDP})
 
 	case "answer":
-		var answer signaling.SdpEvent
+		var answer events.SdpEvent
 
 		if err := json.Unmarshal(msg.Data, &answer); err != nil {
 			return err
@@ -495,7 +496,7 @@ func (h *HttpHandler) handleMessage(
 		}
 
 	case "candidate":
-		var candidate signaling.IceCandidateEvent
+		var candidate events.IceCandidateEvent
 
 		if err := json.Unmarshal(msg.Data, &candidate); err != nil {
 			return err

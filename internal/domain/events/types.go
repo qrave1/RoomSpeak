@@ -1,4 +1,4 @@
-package signaling
+package events
 
 import (
 	"encoding/json"

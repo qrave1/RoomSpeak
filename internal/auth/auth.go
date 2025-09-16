@@ -10,7 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/qrave1/RoomSpeak/internal/constant"
 	"github.com/qrave1/RoomSpeak/internal/infra/postgres/repository"
-	"github.com/qrave1/RoomSpeak/internal/models"
+	"github.com/qrave1/RoomSpeak/internal/domain/models"
 	"golang.org/x/crypto/bcrypt"
 )
 

@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/qrave1/RoomSpeak/internal/models"
+	"github.com/qrave1/RoomSpeak/internal/domain/models"
 )
 
 type UserRepository interface {
