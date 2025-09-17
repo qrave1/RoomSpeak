@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"log/slog"
 	"net/http"
 	"time"
@@ -67,9 +68,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 }
 
 func (h *AuthHandler) GetMe(c echo.Context) error {
-	userID, ok := c.Request().Context().Value(constant.UserID).(uuid.UUID)
+	userID, ok := appctx.UserID(c.Request().Context())
 	if !ok {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token in context"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user ID in context"})
 	}
 
 	user, err := h.userUsecase.GetUserByID(c.Request().Context(), userID)

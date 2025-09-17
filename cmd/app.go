@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"io"
 	"log/slog"
 	"net/http"
@@ -362,7 +363,7 @@ func (h *HttpHandler) handleMessage(
 		}
 
 		// Получаем userID из контекста (если есть)
-		userID, ok := ctx.Value(constant.UserID).(uuid.UUID)
+		userID, ok := appctx.UserID(ctx)
 		if ok {
 			// Добавляем пользователя в канал, если его там нет
 			if err := h.channelUsecase.AddUserToChannel(ctx, userID, channelID); err != nil {
@@ -500,7 +501,7 @@ func (h *HttpHandler) handleMessage(
 
 func (h *HttpHandler) listChannelsHandler(c echo.Context) error {
 	// Получаем userID из JWT токена
-	userID, ok := c.Get("user_id").(uuid.UUID)
+	userID, ok := appctx.UserID(c.Request().Context())
 	if !ok {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
 	}
@@ -529,7 +530,7 @@ func (h *HttpHandler) createChannelHandler(c echo.Context) error {
 	}
 
 	// Получаем userID из JWT токена
-	userID, ok := c.Get("user_id").(uuid.UUID)
+	userID, ok := appctx.UserID(c.Request().Context())
 	if !ok {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
 	}
@@ -557,7 +558,7 @@ func (h *HttpHandler) deleteChannelHandler(c echo.Context) error {
 	}
 
 	// Получаем userID из JWT токена
-	userID, ok := c.Get("user_id").(uuid.UUID)
+	userID, ok := appctx.UserID(c.Request().Context())
 	if !ok {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
 	}

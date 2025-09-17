@@ -1,13 +1,12 @@
 package middleware
 
 import (
-	"context"
 	"github.com/google/uuid"
+	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
-	"github.com/qrave1/RoomSpeak/internal/constant"
 )
 
 func JWTAuthMiddleware(secret string) echo.MiddlewareFunc {
@@ -37,7 +36,7 @@ func JWTAuthMiddleware(secret string) echo.MiddlewareFunc {
 
 			c.SetRequest(
 				c.Request().WithContext(
-					context.WithValue(c.Request().Context(), constant.UserID, userID),
+					appctx.WithUserID(c.Request().Context(), userID),
 				),
 			)
 
