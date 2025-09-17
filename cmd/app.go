@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/qrave1/RoomSpeak/internal/domain/models"
 	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"io"
 	"log/slog"
@@ -499,6 +500,10 @@ func (h *HttpHandler) handleMessage(
 	return nil
 }
 
+type ListChannelsResponse struct {
+	Channels []*models.Channel `json:"channels"`
+}
+
 func (h *HttpHandler) listChannelsHandler(c echo.Context) error {
 	// Получаем userID из JWT токена
 	userID, ok := appctx.UserID(c.Request().Context())
@@ -512,7 +517,11 @@ func (h *HttpHandler) listChannelsHandler(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get channels"})
 	}
 
-	return c.JSON(http.StatusOK, channels)
+	resp := ListChannelsResponse{
+		Channels: channels,
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }
 
 type CreateChannelRequest struct {

@@ -81,13 +81,13 @@
         <ul class="space-y-2 flex-grow">
             <template x-for="channel in channels">
                 <li class="flex items-center justify-between bg-gray-700 p-2 rounded">
-                    <span x-text="channel"></span>
+                    <span x-text="channel.name"></span>
                     <div>
-                        <button @click="joinChannel(channel)"
+                        <button @click="joinChannel(channel.id)"
                                 class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded">
                             <i class="fas fa-sign-in-alt"></i>
                         </button>
-                        <button @click="deleteChannel(channel)"
+                        <button @click="deleteChannel(channel.id)"
                                 class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded ml-2">
                             <i class="fas fa-trash"></i>
                         </button>

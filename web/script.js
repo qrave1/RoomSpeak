@@ -3,7 +3,7 @@ function app() {
         name: '',
         channels: [],
         newChannelName: '',
-        currentChannel: '',
+        currentChannelID: '',
 
         audioInputDevices: [],
         audioOutputDevices: [],
@@ -19,7 +19,7 @@ function app() {
         remoteAudioElements: [],
 
         showDeleteModal: false,
-        channelToDelete: '',
+        channelIDToDelete: '',
 
         isAuthenticated: false,
         showLogin: true,
@@ -164,7 +164,13 @@ function app() {
         async getChannels() {
             try {
                 const response = await fetch('/api/v1/channels');
-                this.channels = await response.json();
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+
+                this.channels = data.channels
             } catch (err) {
                 console.error('Error getting channels:', err);
             }
@@ -181,7 +187,7 @@ function app() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({channel_id: this.newChannelName})
+                    body: JSON.stringify({name: this.newChannelName})
                 });
                 this.newChannelName = '';
                 await this.getChannels();
@@ -190,14 +196,14 @@ function app() {
             }
         },
 
-        deleteChannel(channel) {
-            this.channelToDelete = channel;
+        deleteChannel(channel_id) {
+            this.channelIDToDelete = channel_id;
             this.showDeleteModal = true;
         },
 
         async confirmDelete() {
             try {
-                await fetch(`/api/v1/channels/${this.channelToDelete}`, {
+                await fetch(`/api/v1/channels/${this.channelIDToDelete}`, {
                     method: 'DELETE'
                 });
                 await this.getChannels();
@@ -205,11 +211,11 @@ function app() {
                 console.error('Error deleting channel:', err);
             }
             this.showDeleteModal = false;
-            this.channelToDelete = '';
+            this.channelIDToDelete = '';
         },
 
         async joinChannel(channel) {
-            this.currentChannel = channel;
+            this.currentChannelID = channel;
             await this.connect();
         },
 
@@ -222,7 +228,7 @@ function app() {
             try {
                 this.ws.send(JSON.stringify({
                     type: 'join',
-                    data: {name: this.name, channel_id: this.currentChannel}
+                    data: {name: this.name, channel_id: this.currentChannelID}
                 }));
                 await this.initializeWebRTC();
             } catch (err) {
@@ -398,7 +404,7 @@ function app() {
                 audio.remove();
             }
             this.remoteAudioElements = [];
-            this.currentChannel = '';
+            this.currentChannelID = '';
         }
     }
 }
