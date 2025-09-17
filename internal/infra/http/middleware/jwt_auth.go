@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -29,9 +30,14 @@ func JWTAuthMiddleware(secret string) echo.MiddlewareFunc {
 				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid or expired jwt"})
 			}
 
+			userID, err := uuid.Parse(claims.Subject)
+			if err != nil {
+				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid subject"})
+			}
+
 			c.SetRequest(
 				c.Request().WithContext(
-					context.WithValue(c.Request().Context(), constant.UserID, claims.Subject),
+					context.WithValue(c.Request().Context(), constant.UserID, userID),
 				),
 			)
 

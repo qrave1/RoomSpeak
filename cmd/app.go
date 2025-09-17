@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pion/rtp"
 	"io"
 	"log/slog"
 	"net/http"
@@ -19,7 +20,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
-	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
 
 	"github.com/qrave1/RoomSpeak/internal/auth"
@@ -29,6 +29,7 @@ import (
 	"github.com/qrave1/RoomSpeak/internal/infra/http/middleware"
 	"github.com/qrave1/RoomSpeak/internal/infra/postgres"
 	"github.com/qrave1/RoomSpeak/internal/infra/postgres/repository"
+	"github.com/qrave1/RoomSpeak/internal/usecase"
 )
 
 func runApp() {
@@ -59,11 +60,14 @@ func runApp() {
 	defer dbConn.Close()
 
 	userRepo := repository.NewUserRepo(dbConn)
+	channelRepo := repository.NewChannelRepo(dbConn)
+
+	channelUsecase := usecase.NewChannelUsecase(channelRepo)
 	authHandler := auth.NewAuthHandler(userRepo, cfg.JWTSecret)
 
 	httpHandler := NewHttpHandler(
 		cfg,
-		NewChannelManager(),
+		channelUsecase,
 		&websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				if cfg.Debug {
@@ -112,52 +116,6 @@ func runApp() {
 
 		os.Exit(1)
 	}
-}
-
-type ChannelManager struct {
-	channels map[string]*Channel
-	mu       sync.RWMutex
-}
-
-func NewChannelManager() *ChannelManager {
-	return &ChannelManager{
-		channels: make(map[string]*Channel),
-	}
-}
-
-func (cm *ChannelManager) GetOrCreate(channelID string) *Channel {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if channel, exists := cm.channels[channelID]; exists {
-		return channel
-	}
-
-	channel := NewChannel(channelID)
-
-	cm.channels[channelID] = channel
-
-	return channel
-}
-
-func (cm *ChannelManager) Remove(channelID string) {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	delete(cm.channels, channelID)
-}
-
-func (cm *ChannelManager) ListIDs() []string {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-
-	listIDs := make([]string, 0, len(cm.channels))
-
-	for _, ch := range cm.channels {
-		listIDs = append(listIDs, ch.id)
-	}
-
-	return listIDs
 }
 
 type Channel struct {
@@ -359,7 +317,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 				return nil
 			}
 
-			if err = h.handleMessage(session, signalMessage); err != nil {
+			if err = h.handleMessage(c.Request().Context(), session, signalMessage); err != nil {
 				slog.Error("handle message", slog.Any(constant.Error, err))
 			}
 		}
@@ -367,6 +325,7 @@ func (h *HttpHandler) handleWebSocket(c echo.Context) error {
 }
 
 func (h *HttpHandler) handleMessage(
+	ctx context.Context,
 	session *Session,
 	msg *events.Message,
 ) error {
@@ -378,24 +337,40 @@ func (h *HttpHandler) handleMessage(
 			return err
 		}
 
-		if joinEvent.Name == "" {
-			joinEvent.Name = "Anonymous"
-		}
-
 		if joinEvent.ChannelID == "" {
 			session.WriteWS(map[string]interface{}{"type": constant.Error, "message": "channel_id is required"})
 			return nil
 		}
 
-		session.name = joinEvent.Name
+		// TODO: user from db here
+		session.name = "todo"
 
-		channel := h.channelManager.GetOrCreate(joinEvent.ChannelID)
+		// Проверяем, что канал существует в базе данных
+		channelID, err := uuid.Parse(joinEvent.ChannelID)
+		if err != nil {
+			session.WriteWS(map[string]interface{}{"type": constant.Error, "message": "invalid channel_id format"})
+			return nil
+		}
 
-		channel.AddSession(session)
+		_, err = h.channelUsecase.GetChannel(ctx, channelID)
+		if err != nil {
+			slog.Error("get channel", slog.Any(constant.Error, err))
+			session.WriteWS(map[string]interface{}{"type": constant.Error, "message": "channel not found"})
+			return nil
+		}
+
+		// Получаем userID из контекста (если есть)
+		userID, ok := ctx.Value(constant.UserID).(uuid.UUID)
+		if ok {
+			// Добавляем пользователя в канал, если его там нет
+			if err := h.channelUsecase.AddUserToChannel(ctx, userID, channelID); err != nil {
+				slog.Error("add user to channel", slog.Any(constant.Error, err))
+				// Не блокируем подключение, если не удалось добавить в БД
+			}
+		}
 
 		session.channel = channel
 
-		var err error
 		session.peer, err = createPeerConnection(h.cfg)
 		if err != nil {
 			slog.Error("create peer connection", slog.Any(constant.Error, err))
@@ -521,11 +496,23 @@ func (h *HttpHandler) handleMessage(
 }
 
 func (h *HttpHandler) listChannelsHandler(c echo.Context) error {
-	return c.JSON(http.StatusOK, h.channelManager.ListIDs())
+	// Получаем userID из JWT токена
+	userID, ok := c.Get("user_id").(uuid.UUID)
+	if !ok {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+	}
+
+	channels, err := h.channelUsecase.GetChannelsByUserID(c.Request().Context(), userID)
+	if err != nil {
+		slog.Error("get channels by user id", slog.Any(constant.Error, err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get channels"})
+	}
+
+	return c.JSON(http.StatusOK, channels)
 }
 
 type CreateChannelRequest struct {
-	ChannelID string `json:"channel_id"`
+	Name string `json:"name"`
 }
 
 func (h *HttpHandler) createChannelHandler(c echo.Context) error {
@@ -534,19 +521,60 @@ func (h *HttpHandler) createChannelHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 
-	if req.ChannelID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "channel_id is required"})
+	if req.Name == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "name is required"})
 	}
 
-	h.channelManager.GetOrCreate(req.ChannelID)
+	// Получаем userID из JWT токена
+	userID, ok := c.Get("user_id").(uuid.UUID)
+	if !ok {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+	}
 
-	return c.NoContent(http.StatusCreated)
+	channel, err := h.channelUsecase.CreateChannel(c.Request().Context(), userID, req.Name)
+	if err != nil {
+		slog.Error("create channel", slog.Any(constant.Error, err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to create channel"})
+	}
+
+	// Добавляем создателя в канал
+	if err := h.channelUsecase.AddUserToChannel(c.Request().Context(), userID, channel.ID); err != nil {
+		slog.Error("add user to channel", slog.Any(constant.Error, err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to add user to channel"})
+	}
+
+	return c.JSON(http.StatusCreated, channel)
 }
 
 func (h *HttpHandler) deleteChannelHandler(c echo.Context) error {
-	channelID := c.Param("id")
+	channelIDStr := c.Param("id")
+	channelID, err := uuid.Parse(channelIDStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid channel id"})
+	}
 
-	h.channelManager.Remove(channelID)
+	// Получаем userID из JWT токена
+	userID, ok := c.Get("user_id").(uuid.UUID)
+	if !ok {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
+	}
+
+	// Проверяем, что пользователь является создателем канала
+	channel, err := h.channelUsecase.GetChannel(c.Request().Context(), channelID)
+	if err != nil {
+		slog.Error("get channel", slog.Any(constant.Error, err))
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "channel not found"})
+	}
+
+	if channel.CreatorID != userID {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "only channel creator can delete the channel"})
+	}
+
+	// Удаляем канал из базы данных
+	if err := h.channelUsecase.DeleteChannel(c.Request().Context(), channelID); err != nil {
+		slog.Error("delete channel", slog.Any(constant.Error, err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to delete channel"})
+	}
 
 	return c.NoContent(http.StatusOK)
 }
@@ -576,19 +604,19 @@ func (h *HttpHandler) iceServersHandler(c echo.Context) error {
 type HttpHandler struct {
 	cfg            *config.Config
 	upgrader       *websocket.Upgrader
-	channelManager *ChannelManager
+	channelUsecase usecase.ChannelUsecase
 	db             *sqlx.DB
 }
 
 func NewHttpHandler(
 	cfg *config.Config,
-	channelManager *ChannelManager,
+	channelUsecase usecase.ChannelUsecase,
 	upgrader *websocket.Upgrader,
 	db *sqlx.DB,
 ) *HttpHandler {
 	return &HttpHandler{
 		cfg:            cfg,
-		channelManager: channelManager,
+		channelUsecase: channelUsecase,
 		upgrader:       upgrader,
 		db:             db,
 	}
