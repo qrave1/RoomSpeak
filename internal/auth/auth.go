@@ -5,24 +5,19 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/qrave1/RoomSpeak/internal/constant"
-	"github.com/qrave1/RoomSpeak/internal/infra/postgres/repository"
-	"github.com/qrave1/RoomSpeak/internal/domain/models"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/qrave1/RoomSpeak/internal/usecase"
 )
 
 type AuthHandler struct {
-	userRepo  repository.UserRepository
-	jwtSecret []byte
+	userUsecase usecase.UserUsecase
 }
 
-func NewAuthHandler(userRepo repository.UserRepository, jwtSecret string) *AuthHandler {
+func NewAuthHandler(userUsecase usecase.UserUsecase) *AuthHandler {
 	return &AuthHandler{
-		userRepo:  userRepo,
-		jwtSecret: []byte(jwtSecret),
+		userUsecase: userUsecase,
 	}
 }
 
@@ -32,26 +27,11 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	user, err := h.userUsecase.CreateUser(c.Request().Context(), req.Username, req.Password)
 	if err != nil {
-		slog.Error("generate password hash failed", slog.Any(constant.Error, err))
-
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "could not hash password"})
-	}
-
-	user := models.NewUser()
-
-	user.Username = req.Username
-	user.Password = string(hashedPassword)
-
-	err = h.userRepo.CreateUser(user)
-	if err != nil {
-		slog.Error("user repo create failed", slog.Any(constant.Error, err))
-
+		slog.Error("create user failed", slog.Any(constant.Error, err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "could not create user"})
 	}
-
-	user.Password = ""
 
 	return c.JSON(http.StatusCreated, user)
 }
@@ -62,36 +42,21 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 
-	user, err := h.userRepo.GetUserByUsername(req.Username)
+	user, err := h.userUsecase.ValidateCredentials(c.Request().Context(), req.Username, req.Password)
 	if err != nil {
-		slog.Error("get user from repo failed", slog.Any(constant.Error, err))
-
+		slog.Error("validate credentials failed", slog.String(constant.UserName, req.Username), slog.Any(constant.Error, err))
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		slog.Error("wrong password", slog.String(constant.UserName, user.Username), slog.Any(constant.Error, err))
-
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
-	}
-
-	claims := &jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Subject:   user.ID.String(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	ss, err := token.SignedString(h.jwtSecret)
+	token, err := h.userUsecase.GenerateJWT(user)
 	if err != nil {
-		slog.Error("sign token failed", slog.Any(constant.Error, err))
-
+		slog.Error("generate JWT failed", slog.Any(constant.Error, err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "could not create token"})
 	}
 
 	c.SetCookie(&http.Cookie{
 		Name:     "jwt",
-		Value:    ss,
+		Value:    token,
 		Expires:  time.Now().Add(time.Hour * 72),
 		Path:     "/",
 		Secure:   true,
@@ -102,17 +67,12 @@ func (h *AuthHandler) Login(c echo.Context) error {
 }
 
 func (h *AuthHandler) GetMe(c echo.Context) error {
-	userIDStr, ok := c.Request().Context().Value(constant.UserID).(string)
+	userID, ok := c.Request().Context().Value(constant.UserID).(uuid.UUID)
 	if !ok {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token"})
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token in context"})
 	}
 
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user id in token"})
-	}
-
-	user, err := h.userRepo.GetUserByID(userID)
+	user, err := h.userUsecase.GetUserByID(c.Request().Context(), userID)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "user not found"})
 	}

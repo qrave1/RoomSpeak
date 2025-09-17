@@ -8,13 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/pion/rtp"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/pion/rtp"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -62,8 +63,9 @@ func runApp() {
 	userRepo := repository.NewUserRepo(dbConn)
 	channelRepo := repository.NewChannelRepo(dbConn)
 
+	userUsecase := usecase.NewUserUsecase([]byte(cfg.JWTSecret), userRepo)
 	channelUsecase := usecase.NewChannelUsecase(channelRepo)
-	authHandler := auth.NewAuthHandler(userRepo, cfg.JWTSecret)
+	authHandler := auth.NewAuthHandler(userUsecase)
 
 	httpHandler := NewHttpHandler(
 		cfg,
@@ -107,7 +109,7 @@ func runApp() {
 
 	e.GET("/ice", httpHandler.iceServersHandler)
 
-	err = e.Start(":3000")
+	err = e.Start(":" + cfg.Port)
 	if err != nil {
 		slog.Error(
 			"HTTP server failed",
@@ -369,7 +371,8 @@ func (h *HttpHandler) handleMessage(
 			}
 		}
 
-		session.channel = channel
+		// TODO вернуть
+		//session.channel = channel
 
 		session.peer, err = createPeerConnection(h.cfg)
 		if err != nil {
