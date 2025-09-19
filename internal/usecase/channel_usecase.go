@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/qrave1/RoomSpeak/internal/domain/models"
-	"github.com/qrave1/RoomSpeak/internal/infra/postgres/repository"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 )
 
 type ChannelUsecase interface {

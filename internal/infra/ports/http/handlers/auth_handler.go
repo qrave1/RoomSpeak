@@ -1,14 +1,15 @@
-package auth
+package handlers
 
 import (
-	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"github.com/qrave1/RoomSpeak/internal/constant"
+
+	"github.com/qrave1/RoomSpeak/internal/application/constant"
+	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
+	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/dto"
 	"github.com/qrave1/RoomSpeak/internal/usecase"
 )
 
@@ -23,7 +24,7 @@ func NewAuthHandler(userUsecase usecase.UserUsecase) *AuthHandler {
 }
 
 func (h *AuthHandler) Register(c echo.Context) error {
-	var req RegisterRequest
+	var req dto.RegisterRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
@@ -38,7 +39,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 }
 
 func (h *AuthHandler) Login(c echo.Context) error {
-	var req LoginRequest
+	var req dto.LoginRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
@@ -78,15 +79,10 @@ func (h *AuthHandler) GetMe(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "user not found"})
 	}
 
-	resp := GetMeResponse{
+	resp := dto.GetMeResponse{
 		ID:       user.ID,
 		Username: user.Username,
 	}
 
 	return c.JSON(http.StatusOK, resp)
-}
-
-type GetMeResponse struct {
-	ID       uuid.UUID `json:"id"`
-	Username string    `json:"username"`
 }

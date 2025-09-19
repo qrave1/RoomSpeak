@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/qrave1/RoomSpeak/internal/domain/models"
-	"github.com/qrave1/RoomSpeak/internal/infra/postgres/repository"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 )
 
 // UserUsecase определяет интерфейс для работы с пользователями
