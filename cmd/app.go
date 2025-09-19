@@ -63,7 +63,7 @@ func runApp() {
 
 	echoSrv := server.New(cfg, authHandler, channelHandler, iceHandler, wsHandler)
 
-	srvCh := make(chan (error), 1)
+	srvCh := make(chan error, 1)
 	go func() {
 		srvCh <- echoSrv.Start(":" + cfg.Port)
 	}()
