@@ -83,11 +83,11 @@
                 <li class="flex items-center justify-between bg-gray-700 p-2 rounded">
                     <span x-text="channel.name"></span>
                     <div>
-                        <button @click="joinChannel(channel.id)"
+                        <button @click="joinChannel(channel)"
                                 class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded">
                             <i class="fas fa-sign-in-alt"></i>
                         </button>
-                        <button @click="deleteChannel(channel.id)"
+                        <button @click="deleteChannel(channel)"
                                 class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded ml-2">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -108,6 +108,13 @@
                 <input type="text" x-model="newChannelName" placeholder="Channel Name"
                        class="pl-10 pr-4 py-2 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                 <i class="fas fa-plus absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            </div>
+            <div class="mt-2">
+                <label class="flex items-center">
+                    <input type="checkbox" x-model="newChannelIsPublic" 
+                           class="mr-2 bg-gray-700 border-gray-600 rounded text-indigo-600 focus:ring-indigo-500 focus:ring-2">
+                    <span class="text-sm text-gray-400">Сделать канал публичным</span>
+                </label>
             </div>
             <button @click="createChannel()"
                     class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-2">
@@ -155,7 +162,7 @@
         </div>
 
         <div x-show="pc" class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4">Participants in <span x-text="currentChannel"></span></h3>
+            <h3 class="text-xl font-bold mb-4">Participants in  <b><span x-text="currentChannelName"></span></b></h3>
             <ul class="space-y-2 flex-grow">
                 <template x-for="participant in participants">
                     <li class="flex items-center bg-gray-700 p-2 rounded">
@@ -178,7 +185,7 @@
      style="display: none;">
     <div class="bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-sm">
         <h3 class="text-xl font-bold mb-4">Delete Channel</h3>
-        <p>Are you sure you want to delete the channel "<span x-text="channelToDelete"></span>"?</p>
+        <p>Are you sure you want to delete the channel "<span x-text="channelNameToDelete"></span>"?</p>
         <div class="mt-6 flex justify-end space-x-4">
             <button @click="showDeleteModal = false"
                     class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">

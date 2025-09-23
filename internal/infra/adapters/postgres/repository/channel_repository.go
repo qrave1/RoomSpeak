@@ -18,6 +18,7 @@ type ChannelRepository interface {
 	RemoveUserFromChannel(ctx context.Context, userID, channelID uuid.UUID) error
 
 	GetChannelsByUserID(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error)
+	GetPublicChannels(ctx context.Context) ([]*models.Channel, error)
 }
 
 type channelRepo struct {
@@ -31,10 +32,11 @@ func NewChannelRepo(db *sqlx.DB) ChannelRepository {
 func (r *channelRepo) Create(ctx context.Context, channel *models.Channel) error {
 	_, err := r.db.ExecContext(
 		ctx,
-		"INSERT INTO channels (id, creator_id, name) VALUES ($1, $2, $3)",
+		"INSERT INTO channels (id, creator_id, name, is_public) VALUES ($1, $2, $3, $4)",
 		channel.ID,
 		channel.CreatorID,
 		channel.Name,
+		channel.IsPublic,
 	)
 
 	return err
@@ -90,6 +92,23 @@ func (r *channelRepo) GetChannelsByUserID(ctx context.Context, userID uuid.UUID)
 	`
 
 	err := r.db.SelectContext(ctx, &channels, query, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return channels, nil
+}
+
+func (r *channelRepo) GetPublicChannels(ctx context.Context) ([]*models.Channel, error) {
+	var channels []*models.Channel
+
+	query := `
+		SELECT c.*
+		FROM channels c
+		WHERE c.is_public = true
+	`
+
+	err := r.db.SelectContext(ctx, &channels, query)
 	if err != nil {
 		return nil, err
 	}

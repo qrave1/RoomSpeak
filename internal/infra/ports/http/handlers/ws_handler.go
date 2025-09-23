@@ -15,6 +15,7 @@ import (
 	"github.com/qrave1/RoomSpeak/internal/application/config"
 	"github.com/qrave1/RoomSpeak/internal/application/constant"
 	"github.com/qrave1/RoomSpeak/internal/domain/events"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
 	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"github.com/qrave1/RoomSpeak/internal/usecase"
 )
@@ -23,9 +24,11 @@ type WebSocketHandler struct {
 	upgrader *websocket.Upgrader
 
 	signalingUsecase usecase.SignalingUsecase
+
+	wsConnRepo memory.WebsocketConnectionRepository
 }
 
-func NewWebSocketHandler(cfg *config.Config, signalingUsecase usecase.SignalingUsecase) *WebSocketHandler {
+func NewWebSocketHandler(cfg *config.Config, signalingUsecase usecase.SignalingUsecase, wsConnRepo memory.WebsocketConnectionRepository) *WebSocketHandler {
 	return &WebSocketHandler{
 		upgrader: &websocket.Upgrader{
 			ReadBufferSize:  1024,
@@ -39,6 +42,7 @@ func NewWebSocketHandler(cfg *config.Config, signalingUsecase usecase.SignalingU
 			},
 		},
 		signalingUsecase: signalingUsecase,
+		wsConnRepo:       wsConnRepo,
 	}
 }
 
@@ -52,6 +56,13 @@ func (h *WebSocketHandler) Handle(c echo.Context) error {
 		return err
 	}
 	defer ws.Close()
+
+	userID, ok := appctx.UserID(c.Request().Context())
+	if !ok {
+		return fmt.Errorf("get user id from context")
+	}
+
+	h.wsConnRepo.Add(userID, ws)
 
 	err = ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 	if err != nil {

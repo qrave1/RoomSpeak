@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/qrave1/RoomSpeak/internal/domain/input"
 )
 
 type Channel struct {
@@ -15,11 +17,12 @@ type Channel struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
-func NewChannel(creatorID uuid.UUID, name string) *Channel {
+func NewChannel(input *input.CreateChannelInput) *Channel {
 	return &Channel{
 		ID:        uuid.New(),
-		CreatorID: creatorID,
-		Name:      name,
+		CreatorID: input.CreatorID,
+		Name:      input.Name,
+		IsPublic:  input.IsPublic,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}

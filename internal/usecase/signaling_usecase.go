@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -25,7 +26,9 @@ type SignalingUsecase interface {
 }
 
 type signalingUsecase struct {
-	channelRepo        postrepo.ChannelRepository
+	channelRepo postrepo.ChannelRepository
+	userRepo    postrepo.UserRepository
+
 	pcRepo             memory.PeerConnectionRepository
 	wsRepo             memory.WebsocketConnectionRepository
 	channelMembersRepo memory.ChannelMembersRepository
@@ -35,6 +38,7 @@ type signalingUsecase struct {
 
 func NewSignalingUsecase(
 	channelRepo postrepo.ChannelRepository,
+	userRepo postrepo.UserRepository,
 	pcRepo memory.PeerConnectionRepository,
 	wsRepo memory.WebsocketConnectionRepository,
 	channelMembersRepo memory.ChannelMembersRepository,
@@ -42,6 +46,7 @@ func NewSignalingUsecase(
 ) SignalingUsecase {
 	return &signalingUsecase{
 		channelRepo:        channelRepo,
+		userRepo:           userRepo,
 		pcRepo:             pcRepo,
 		wsRepo:             wsRepo,
 		channelMembersRepo: channelMembersRepo,
@@ -78,7 +83,31 @@ func (s *signalingUsecase) HandleJoin(ctx context.Context, userID uuid.UUID, joi
 
 	s.pcRepo.Add(userID, peer)
 
-	s.channelMembersRepo.AddMember(ctx, channelID, userID)
+	user, err := s.userRepo.GetUserByID(userID)
+	if err != nil {
+		return fmt.Errorf("get user from postgres: %w", err)
+	}
+
+	s.channelMembersRepo.AddMember(ctx, channelID, user)
+
+	// TODO: переделать нейминг говна
+	members := s.channelMembersRepo.GetMembers(ctx, channelID)
+
+	activeMembers := events.ParticipantListEvent{List: make([]string, 0, len(members))}
+
+	for _, member := range members {
+		activeMembers.List = append(activeMembers.List, member.Username)
+	}
+
+	activeMembersDataJSON, err := json.Marshal(activeMembers)
+	if err != nil {
+		return fmt.Errorf("marshal active members: %w", err)
+
+	}
+
+	for _, member := range members {
+		s.wsRepo.Write(member.ID, events.Message{Type: "participants", Data: activeMembersDataJSON})
+	}
 
 	return nil
 }

@@ -9,7 +9,7 @@ services:
   traefik:
     image: traefik:v3.5.1
     container_name: traefik
-    profiles: [ deploy ]
+    profiles: [deploy]
     restart: always
     command:
       - --configFile=/etc/traefik/traefik.yml
@@ -34,9 +34,11 @@ services:
   roomspeak:
     image: ghcr.io/qrave1/roomspeak:latest
     container_name: roomspeak-backend
-    profiles: [ app ]
+    profiles: [app]
     restart: always
     env_file: .env
+    ports:
+      - "3000:3000"
     networks:
       - traefik
     labels:
@@ -49,15 +51,15 @@ services:
   migrate:
     image: ghcr.io/qrave1/roomspeak:latest
     container_name: migrate
-    command: [ "./build", "migrate", "up" ]
-    profiles: [ migrate ]
+    command: ["./build", "migrate", "up"]
+    profiles: [migrate]
     restart: no
     env_file: .env
 
   postgres:
     image: postgres:17-alpine
     container_name: roomspeak-postgres
-    profiles: [ infra ]
+    profiles: [infra]
     restart: unless-stopped
     environment:
       - POSTGRES_USER=postgres
@@ -69,12 +71,12 @@ services:
       - "5432:5432"
     networks:
       - default
-  
+
   coturn:
     image: coturn/coturn:4.7-alpine
     container_name: coturn
-    profiles: [ coturn ]
-    command: [ "-c", "/etc/coturn/coturn.conf" ]
+    profiles: [coturn]
+    command: ["-c", "/etc/coturn/coturn.conf"]
     restart: unless-stopped
     network_mode: "host"
     volumes:

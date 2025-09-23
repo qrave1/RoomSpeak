@@ -3,7 +3,10 @@ function app() {
         name: '',
         channels: [],
         newChannelName: '',
+        newChannelIsPublic: false,
+
         currentChannelID: '',
+        currentChannelName: '',
 
         audioInputDevices: [],
         audioOutputDevices: [],
@@ -20,6 +23,7 @@ function app() {
 
         showDeleteModal: false,
         channelIDToDelete: '',
+        channelNameToDelete: '',
 
         isAuthenticated: false,
         showLogin: true,
@@ -187,17 +191,22 @@ function app() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({name: this.newChannelName})
+                    body: JSON.stringify({
+                        name: this.newChannelName,
+                        is_public: this.newChannelIsPublic
+                    })
                 });
                 this.newChannelName = '';
+                this.newChannelIsPublic = false;
                 await this.getChannels();
             } catch (err) {
                 console.error('Error creating channel:', err);
             }
         },
 
-        deleteChannel(channel_id) {
-            this.channelIDToDelete = channel_id;
+        deleteChannel(channel) {
+            this.channelIDToDelete = channel.id;
+            this.channelNameToDelete = channel.name;
             this.showDeleteModal = true;
         },
 
@@ -215,7 +224,8 @@ function app() {
         },
 
         async joinChannel(channel) {
-            this.currentChannelID = channel;
+            this.currentChannelID = channel.id;
+            this.currentChannelName = channel.name;
             await this.connect();
         },
 
@@ -238,7 +248,7 @@ function app() {
 
         async initializeWebSocket() {
             // TODO убрать залупу
-            this.ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`);
+            this.ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/v1/ws`);
 
             this.ws.onopen = () => {
                 // ping-pong для поддержания соединения
@@ -262,7 +272,7 @@ function app() {
         },
 
         async initializeWebRTC() {
-            const iceReq = await fetch('/ice')
+            const iceReq = await fetch('/api/v1/ice')
             const iceServersResponse = await iceReq.json()
 
             const iceServers = [
@@ -363,7 +373,7 @@ function app() {
                     }
                     break;
                 case 'participants':
-                    this.updateParticipants(message.list);
+                    this.updateParticipants(message.data.list);
                     break;
                 case 'error':
                     console.error('Server error:', message.message);

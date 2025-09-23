@@ -38,6 +38,7 @@ func runApp() {
 
 	slog.Info("Running app", slog.Bool("debug", cfg.Debug))
 
+	// TODO DI
 	dbConn, err := postgres.NewPostgres(ctx, cfg.Postgres.DSN())
 	if err != nil {
 		slog.Error("connect to postgres", slog.Any(constant.Error, err))
@@ -54,12 +55,12 @@ func runApp() {
 	userUsecase := usecase.NewUserUsecase([]byte(cfg.JWTSecret), userRepo)
 	channelUsecase := usecase.NewChannelUsecase(channelRepo)
 	peerUsecase := usecase.NewPeerUsecase(cfg, pcConnRepo, wsConnRepo, channelMembersRepo)
-	signalingUsecase := usecase.NewSignalingUsecase(channelRepo, pcConnRepo, wsConnRepo, channelMembersRepo, peerUsecase)
+	signalingUsecase := usecase.NewSignalingUsecase(channelRepo, userRepo, pcConnRepo, wsConnRepo, channelMembersRepo, peerUsecase)
 
 	authHandler := handlers.NewAuthHandler(userUsecase)
 	channelHandler := handlers.NewChannelHandler(channelUsecase)
 	iceHandler := handlers.NewIceHandler(cfg)
-	wsHandler := handlers.NewWebSocketHandler(cfg, signalingUsecase)
+	wsHandler := handlers.NewWebSocketHandler(cfg, signalingUsecase, wsConnRepo)
 
 	echoSrv := server.New(cfg, authHandler, channelHandler, iceHandler, wsHandler)
 

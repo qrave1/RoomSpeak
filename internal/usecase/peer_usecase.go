@@ -102,11 +102,11 @@ func (p *peerUsecase) broadcastRTP(ctx context.Context, pkt *rtp.Packet, userID 
 	members := p.channelMembersRepo.GetMembers(ctx, channelID)
 
 	for _, member := range members {
-		if member == userID {
+		if member.ID == userID {
 			continue
 		}
 
-		pc, ok := p.pcRepo.Get(member)
+		pc, ok := p.pcRepo.Get(member.ID)
 		if !ok {
 			slog.Error("get peer connection in broadcast")
 			continue

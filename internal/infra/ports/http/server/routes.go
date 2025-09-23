@@ -32,6 +32,10 @@ func New(
 		{
 			v1.GET("/me", authHandler.GetMe)
 
+			v1.GET("/ice", iceHandler.IceServers)
+
+			v1.GET("/ws", wsHandler.Handle)
+
 			v1.GET("/channels", channelHandler.ListChannelsHandler)
 			v1.POST("/channels", channelHandler.CreateChannelHandler)
 			v1.DELETE("/channels/:id", channelHandler.DeleteChannelHandler)
@@ -39,9 +43,6 @@ func New(
 	}
 
 	e.Static("/", "web")
-	e.GET("/ws", wsHandler.Handle)
-
-	e.GET("/ice", iceHandler.IceServers)
 
 	return e
 }
