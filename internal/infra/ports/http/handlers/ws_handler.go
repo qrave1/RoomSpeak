@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"time"
@@ -63,6 +64,7 @@ func (h *WebSocketHandler) Handle(c echo.Context) error {
 	}
 
 	h.wsConnRepo.Add(userID, ws)
+	defer h.wsConnRepo.Remove(userID)
 
 	err = ws.SetReadDeadline(time.Now().Add(60 * time.Second))
 	if err != nil {
@@ -97,10 +99,15 @@ func (h *WebSocketHandler) Handle(c echo.Context) error {
 		default:
 			_, msg, err := ws.ReadMessage()
 			if err != nil {
-				slog.Error(
-					"webSocket read error",
-					slog.Any(constant.Error, err),
-				)
+				h.handleWebsocketError(c.Request().Context(), err)
+
+				if err = h.signalingUsecase.HandleLeave(c.Request().Context(), userID); err != nil {
+					slog.Error(
+						"handle leave while reading websocket message",
+						slog.Any(constant.Error, err),
+						slog.Any(constant.UserID, userID),
+					)
+				}
 
 				return nil
 			}
@@ -186,4 +193,26 @@ func (h *WebSocketHandler) handleMessage(
 	}
 
 	return nil
+}
+
+func (h *WebSocketHandler) handleWebsocketError(ctx context.Context, err error) {
+	userID, ok := appctx.UserID(ctx)
+	if !ok {
+		userID = uuid.Nil
+	}
+
+	var closeErr *websocket.CloseError
+	if errors.As(err, &closeErr) {
+		switch closeErr.Code {
+		case websocket.CloseNormalClosure, websocket.CloseGoingAway:
+			slog.Info("user disconnected from websocket", slog.Any(constant.UserID, userID))
+		default:
+			slog.Error("websocket close error")
+		}
+	} else {
+		slog.Error(
+			"websocket read",
+			slog.Any(constant.Error, err),
+		)
+	}
 }

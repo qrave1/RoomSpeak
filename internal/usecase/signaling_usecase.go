@@ -15,6 +15,8 @@ import (
 )
 
 type SignalingUsecase interface {
+	BroadcastActiveMembers(ctx context.Context, channelID uuid.UUID) error
+
 	HandleJoin(context.Context, uuid.UUID, events.JoinEvent) error
 	HandleLeave(context.Context, uuid.UUID) error
 
@@ -90,7 +92,16 @@ func (s *signalingUsecase) HandleJoin(ctx context.Context, userID uuid.UUID, joi
 
 	s.channelMembersRepo.AddMember(ctx, channelID, user)
 
-	// TODO: переделать нейминг говна
+	if err = s.BroadcastActiveMembers(ctx, channelID); err != nil {
+		return fmt.Errorf("broadcast active members: %w", err)
+	}
+
+	return nil
+}
+
+// TODO: переделать нейминг говна
+func (s *signalingUsecase) BroadcastActiveMembers(ctx context.Context, channelID uuid.UUID) error {
+
 	members := s.channelMembersRepo.GetMembers(ctx, channelID)
 
 	activeMembers := events.ParticipantListEvent{List: make([]string, 0, len(members))}
@@ -121,6 +132,10 @@ func (s *signalingUsecase) HandleLeave(ctx context.Context, userID uuid.UUID) er
 	s.channelMembersRepo.RemoveMember(ctx, peer.ChannelID, userID)
 
 	s.pcRepo.Remove(userID)
+
+	if err := s.BroadcastActiveMembers(ctx, peer.ChannelID); err != nil {
+		return fmt.Errorf("broadcast active members: %w", err)
+	}
 
 	return nil
 }

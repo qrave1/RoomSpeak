@@ -53,7 +53,6 @@ func (w *wsConnectionRepository) Remove(userID uuid.UUID) {
 func (w *wsConnectionRepository) Write(userID uuid.UUID, payload any) {
 	safews, ok := w.getSafeWS(userID)
 	if !ok {
-		slog.Error("get websocket", slog.Any(constant.UserID, userID))
 		return
 	}
 
@@ -62,7 +61,11 @@ func (w *wsConnectionRepository) Write(userID uuid.UUID, payload any) {
 
 	err := safews.conn.WriteJSON(payload)
 	if err != nil {
-		slog.Error("write to websocket", slog.Any(constant.UserID, userID))
+		slog.Error(
+			"write to websocket",
+			slog.Any(constant.Error, err),
+			slog.Any(constant.UserID, userID),
+		)
 		return
 	}
 }

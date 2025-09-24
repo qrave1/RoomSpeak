@@ -17,7 +17,7 @@ func New(
 ) *echo.Echo {
 	e := echo.New()
 
-	e.Use(middleware.SlogLogger())
+	//e.Use(middleware.SlogLogger())
 
 	api := e.Group("/api")
 	{

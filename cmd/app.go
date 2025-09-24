@@ -36,8 +36,6 @@ func runApp() {
 		os.Exit(1)
 	}
 
-	slog.Info("Running app", slog.Bool("debug", cfg.Debug))
-
 	// TODO DI
 	dbConn, err := postgres.NewPostgres(ctx, cfg.Postgres.DSN())
 	if err != nil {
