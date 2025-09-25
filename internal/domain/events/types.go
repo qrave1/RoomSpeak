@@ -1,4 +1,4 @@
-package signaling
+package events
 
 import (
 	"encoding/json"
@@ -14,7 +14,6 @@ type Message struct {
 
 // JoinEvent - событие при подключении нового участника в комнату
 type JoinEvent struct {
-	Name      string `json:"Name"`
 	ChannelID string `json:"channel_id"`
 }
 

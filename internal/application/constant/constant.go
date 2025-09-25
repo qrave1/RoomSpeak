@@ -6,10 +6,7 @@ const (
 	UserID   = "user_id"
 	UserName = "username"
 
-	SessionID   = "session_id"
-	SessionName = "session_name"
-
-	RoomID = "room_id"
+	ChannelID = "channel_id"
 
 	State = "state"
 )

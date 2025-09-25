@@ -5,8 +5,8 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
-	"github.com/qrave1/RoomSpeak/internal/config"
-	"github.com/qrave1/RoomSpeak/internal/infra/postgres/migrations"
+	"github.com/qrave1/RoomSpeak/internal/application/config"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/migrations"
 	"github.com/spf13/cobra"
 )
 

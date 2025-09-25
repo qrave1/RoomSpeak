@@ -3,7 +3,10 @@ function app() {
         name: '',
         channels: [],
         newChannelName: '',
-        currentChannel: '',
+        newChannelIsPublic: false,
+
+        currentChannelID: '',
+        currentChannelName: '',
 
         audioInputDevices: [],
         audioOutputDevices: [],
@@ -19,7 +22,8 @@ function app() {
         remoteAudioElements: [],
 
         showDeleteModal: false,
-        channelToDelete: '',
+        channelIDToDelete: '',
+        channelNameToDelete: '',
 
         isAuthenticated: false,
         showLogin: true,
@@ -164,7 +168,13 @@ function app() {
         async getChannels() {
             try {
                 const response = await fetch('/api/v1/channels');
-                this.channels = await response.json();
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+
+                this.channels = data.channels
             } catch (err) {
                 console.error('Error getting channels:', err);
             }
@@ -181,9 +191,13 @@ function app() {
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({channel_id: this.newChannelName})
+                    body: JSON.stringify({
+                        name: this.newChannelName,
+                        is_public: this.newChannelIsPublic
+                    })
                 });
                 this.newChannelName = '';
+                this.newChannelIsPublic = false;
                 await this.getChannels();
             } catch (err) {
                 console.error('Error creating channel:', err);
@@ -191,13 +205,14 @@ function app() {
         },
 
         deleteChannel(channel) {
-            this.channelToDelete = channel;
+            this.channelIDToDelete = channel.id;
+            this.channelNameToDelete = channel.name;
             this.showDeleteModal = true;
         },
 
         async confirmDelete() {
             try {
-                await fetch(`/api/v1/channels/${this.channelToDelete}`, {
+                await fetch(`/api/v1/channels/${this.channelIDToDelete}`, {
                     method: 'DELETE'
                 });
                 await this.getChannels();
@@ -205,11 +220,12 @@ function app() {
                 console.error('Error deleting channel:', err);
             }
             this.showDeleteModal = false;
-            this.channelToDelete = '';
+            this.channelIDToDelete = '';
         },
 
         async joinChannel(channel) {
-            this.currentChannel = channel;
+            this.currentChannelID = channel.id;
+            this.currentChannelName = channel.name;
             await this.connect();
         },
 
@@ -222,7 +238,7 @@ function app() {
             try {
                 this.ws.send(JSON.stringify({
                     type: 'join',
-                    data: {name: this.name, channel_id: this.currentChannel}
+                    data: {name: this.name, channel_id: this.currentChannelID}
                 }));
                 await this.initializeWebRTC();
             } catch (err) {
@@ -232,7 +248,7 @@ function app() {
 
         async initializeWebSocket() {
             // TODO убрать залупу
-            this.ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`);
+            this.ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/v1/ws`);
 
             this.ws.onopen = () => {
                 // ping-pong для поддержания соединения
@@ -256,7 +272,7 @@ function app() {
         },
 
         async initializeWebRTC() {
-            const iceReq = await fetch('/ice')
+            const iceReq = await fetch('/api/v1/ice')
             const iceServersResponse = await iceReq.json()
 
             const iceServers = [
@@ -304,6 +320,8 @@ function app() {
                 if (event.track.kind === 'audio') {
                     const audio = new Audio();
                     audio.srcObject = event.streams[0];
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
 
                     // Устанавливаем выбранное устройство вывода
                     if (this.selectedOutputDevice && 'setSinkId' in audio) {
@@ -313,7 +331,7 @@ function app() {
 
                     this.remoteAudioElements.push(audio);
 
-                    audio.play();
+                    audio.play().catch(err => console.error('Failed to play remote audio:', err));
                 }
             };
 
@@ -355,7 +373,7 @@ function app() {
                     }
                     break;
                 case 'participants':
-                    this.updateParticipants(message.list);
+                    this.updateParticipants(message.data.list);
                     break;
                 case 'error':
                     console.error('Server error:', message.message);
@@ -391,10 +409,12 @@ function app() {
             }
 
             for (const audio of this.remoteAudioElements) {
+                audio.pause();
                 audio.srcObject = null;
+                audio.remove();
             }
             this.remoteAudioElements = [];
-            this.currentChannel = '';
+            this.currentChannelID = '';
         }
     }
 }
