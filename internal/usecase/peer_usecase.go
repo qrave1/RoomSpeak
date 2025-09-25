@@ -85,7 +85,7 @@ func (p *peerUsecase) CreateWebrtcPeer(ctx context.Context, userID uuid.UUID, ch
 	//	if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateDisconnected {
 	//		slog.Error("PeerConnection bad status",
 	//			slog.String(constant.State, state.String()),
-	//			slog.Any(constant.UserID, userID),
+	//			slog.Any(constant.UserName, userID),
 	//		)
 	//
 	//		p.wsRepo.Write(userID, map[string]any{
