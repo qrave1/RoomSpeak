@@ -185,6 +185,19 @@ func (h *WebSocketHandler) handleMessage(
 		if err := h.signalingUsecase.HandleLeave(ctx, userID); err != nil {
 			return fmt.Errorf("handle leave: %w", err)
 		}
+	case "mute":
+		var muteEvent struct {
+			IsMuted bool `json:"is_muted"`
+		}
+
+		if err := json.Unmarshal(msg.Data, &muteEvent); err != nil {
+			return fmt.Errorf("unmarshal mute event: %w", err)
+		}
+
+		if err := h.signalingUsecase.HandleMute(ctx, userID, muteEvent.IsMuted); err != nil {
+			return fmt.Errorf("handle mute: %w", err)
+		}
+
 	case "ping":
 		h.signalingUsecase.HandlePing(ctx, userID)
 

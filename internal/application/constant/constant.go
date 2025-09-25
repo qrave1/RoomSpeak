@@ -7,6 +7,4 @@ const (
 	UserName = "username"
 
 	ChannelID = "channel_id"
-
-	State = "state"
 )

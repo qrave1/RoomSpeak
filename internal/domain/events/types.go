@@ -31,3 +31,9 @@ type IceCandidateEvent struct {
 type ParticipantListEvent struct {
 	List []string `json:"list"`
 }
+
+// UserActionEvent - событие, связанное с действием пользователя, например, отключение микрофона
+type UserActionEvent struct {
+	UserName string `json:"user_name"`
+	IsMuted  bool   `json:"is_muted"`
+}

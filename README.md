@@ -13,9 +13,10 @@
 
 - [x] Basic WebRTC Voice Chat
 - [x] Frontend UI/UX Redesign
-- [ ] User Authentication + RBAC
-- [ ] Channel Creation and Management
-- [ ] Mute / Unmute + channel notifying
+- [x] User Authentication
+- [ ] RBAC
+- [x] Channel Creation and Management
+- [x] Mute / Unmute + channel notifying
 - [ ] Voice activity detection via WebRTC Data Channels
 - [ ] Channel messaging via WebRTC Data Channels
 - [ ] Frontend for mobile

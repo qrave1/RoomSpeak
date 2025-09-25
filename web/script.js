@@ -32,6 +32,8 @@ function app() {
             password: ''
         },
 
+        isMuted: false,
+
         async init() {
             await this.checkAuth();
             if (this.isAuthenticated) {
@@ -375,6 +377,16 @@ function app() {
                 case 'participants':
                     this.updateParticipants(message.data.list);
                     break;
+                case 'user_action':
+                    const participantIndex = this.participants.findIndex(p => p.startsWith(message.data.user_name));
+                    if (participantIndex !== -1) {
+                        if (message.data.is_muted) {
+                            this.participants[participantIndex] = `${message.data.user_name} <i class="fas fa-microphone-slash text-red-500"></i>`;
+                        } else {
+                            this.participants[participantIndex] = message.data.user_name;
+                        }
+                    }
+                    break;
                 case 'error':
                     console.error('Server error:', message.message);
                     alert('Server error: ' + message.message);
@@ -391,6 +403,29 @@ function app() {
 
         updateParticipants(participants) {
             this.participants = participants
+        },
+
+        toggleMute() {
+            this.isMuted = !this.isMuted;
+            this.localStream.getAudioTracks()[0].enabled = !this.isMuted;
+
+            this.ws.send(JSON.stringify({
+                type: 'mute',
+                data: {
+                    is_muted: this.isMuted
+                }
+            }));
+
+            const muteButton = document.getElementById('mute-btn');
+            if (this.isMuted) {
+                muteButton.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+                muteButton.classList.remove('bg-gray-600');
+                muteButton.classList.add('bg-red-600');
+            } else {
+                muteButton.innerHTML = '<i class="fas fa-microphone"></i>';
+                muteButton.classList.remove('bg-red-600');
+                muteButton.classList.add('bg-gray-600');
+            }
         },
 
         disconnect() {

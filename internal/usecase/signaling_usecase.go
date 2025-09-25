@@ -25,6 +25,7 @@ type SignalingUsecase interface {
 	HandleCandidate(context.Context, uuid.UUID, webrtc.ICECandidateInit) error
 
 	HandlePing(context.Context, uuid.UUID)
+	HandleMute(ctx context.Context, userID uuid.UUID, isMuted bool) error
 }
 
 type signalingUsecase struct {
@@ -199,4 +200,35 @@ func (s *signalingUsecase) HandleCandidate(ctx context.Context, userID uuid.UUID
 
 func (s *signalingUsecase) HandlePing(ctx context.Context, userID uuid.UUID) {
 	s.wsRepo.Write(userID, map[string]any{"type": "pong"})
+}
+
+func (s *signalingUsecase) HandleMute(ctx context.Context, userID uuid.UUID, isMuted bool) error {
+	peer, ok := s.pcRepo.Get(userID)
+	if !ok {
+		return fmt.Errorf("peer connection not found")
+	}
+
+	members := s.channelMembersRepo.GetMembers(ctx, peer.ChannelID)
+
+	user, err := s.userRepo.GetUserByID(userID)
+	if err != nil {
+		return fmt.Errorf("get user from postgres: %w", err)
+	}
+
+	userActionEvent, err := json.Marshal(events.UserActionEvent{
+		UserName: user.Username,
+		IsMuted:  isMuted,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal user action event: %w", err)
+	}
+
+	for _, member := range members {
+		if member.ID == userID {
+			continue
+		}
+		s.wsRepo.Write(member.ID, events.Message{Type: "user_action", Data: userActionEvent})
+	}
+
+	return nil
 }
