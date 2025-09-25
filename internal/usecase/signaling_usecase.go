@@ -215,7 +215,7 @@ func (s *signalingUsecase) HandleMute(ctx context.Context, userID uuid.UUID, isM
 		return fmt.Errorf("get user from postgres: %w", err)
 	}
 
-	data, err := json.Marshal(events.UserActionEvent{
+	userActionEvent, err := json.Marshal(events.UserActionEvent{
 		UserName: user.Username,
 		IsMuted:  isMuted,
 	})
@@ -227,7 +227,7 @@ func (s *signalingUsecase) HandleMute(ctx context.Context, userID uuid.UUID, isM
 		if member.ID == userID {
 			continue
 		}
-		s.wsRepo.Write(member.ID, events.Message{Type: "user_action", Data: data})
+		s.wsRepo.Write(member.ID, events.Message{Type: "user_action", Data: userActionEvent})
 	}
 
 	return nil
