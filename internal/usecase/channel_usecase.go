@@ -23,7 +23,7 @@ type ChannelUsecase interface {
 	RemoveUserFromChannel(ctx context.Context, userID, channelID uuid.UUID) error
 	GetAvailableChannelsForUser(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error)
 
-	GetActiveUsersByID(ctx context.Context, channelID uuid.UUID) []runtime.ActiveUser
+	GetActiveUsersByID(ctx context.Context, channelID uuid.UUID) ([]runtime.ActiveUser, error)
 }
 
 type channelUsecase struct {
@@ -83,6 +83,6 @@ func (uc *channelUsecase) GetAvailableChannelsForUser(ctx context.Context, userI
 	return uc.channelRepo.GetAvailableChannelsForUser(ctx, userID)
 }
 
-func (uc *channelUsecase) GetActiveUsersByID(ctx context.Context, channelID uuid.UUID) []runtime.ActiveUser {
-	return uc.activeUserRepo.GetInChannel(ctx, channelID)
+func (uc *channelUsecase) GetActiveUsersByID(ctx context.Context, channelID uuid.UUID) ([]runtime.ActiveUser, error) {
+	return uc.activeUserRepo.GetInChannel(ctx, channelID), nil
 }

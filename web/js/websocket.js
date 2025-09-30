@@ -9,7 +9,7 @@ export function initializeWebSocket(onOpen, onMessage, onClose, onError) {
     return ws;
 }
 
-export async function handleWSMessage(event, pc, updateParticipants, disconnect) {
+export async function handleWSMessage(event, pc, updateParticipants, updateDetailedParticipants, disconnect) {
     const message = JSON.parse(event.data);
 
     switch (message.type) {
@@ -36,8 +36,8 @@ export async function handleWSMessage(event, pc, updateParticipants, disconnect)
                 console.error('Error adding ICE candidate:', err);
             }
             break;
-        case 'participants':
-            updateParticipants(message.data.list);
+        case 'participants_detailed':
+            updateDetailedParticipants(message.data.participants);
             break;
         case 'user_action':
             const participantIndex = this.participants.findIndex(p => p.startsWith(message.data.user_name));
@@ -48,6 +48,13 @@ export async function handleWSMessage(event, pc, updateParticipants, disconnect)
                     this.participants[participantIndex] = message.data.user_name;
                 }
             }
+            // Обновляем детальную информацию об участниках
+            updateDetailedParticipants(this.detailedParticipants.map(p => {
+                if (p.username === message.data.user_name) {
+                    return {...p, is_muted: message.data.is_muted};
+                }
+                return p;
+            }));
             break;
         case 'error':
             console.error('Server error:', message.message);

@@ -11,15 +11,17 @@ import (
 	"github.com/qrave1/RoomSpeak/internal/domain/input"
 	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/dto"
+	postrepo "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 	"github.com/qrave1/RoomSpeak/internal/usecase"
 )
 
 type ChannelHandler struct {
 	channelUsecase usecase.ChannelUsecase
+	userRepo       postrepo.UserRepository
 }
 
-func NewChannelHandler(channelUsecase usecase.ChannelUsecase) *ChannelHandler {
-	return &ChannelHandler{channelUsecase: channelUsecase}
+func NewChannelHandler(channelUsecase usecase.ChannelUsecase, userRepo postrepo.UserRepository) *ChannelHandler {
+	return &ChannelHandler{channelUsecase: channelUsecase, userRepo: userRepo}
 }
 
 func (h *ChannelHandler) ListChannelsHandler(c echo.Context) error {
@@ -41,9 +43,26 @@ func (h *ChannelHandler) ListChannelsHandler(c echo.Context) error {
 	}
 
 	for _, ch := range availableChannels {
-		actives := h.channelUsecase.GetActiveUsersByID(c.Request().Context(), ch.ID)
+		activeUsers, err := h.channelUsecase.GetActiveUsersByID(c.Request().Context(), ch.ID)
+		if err != nil {
+			slog.Error("get active users by id", slog.Any(constant.Error, err))
+			continue
+		}
 
-		resp.Channels = append(resp.Channels, dto.NewChannelResponseFromModel(ch, actives))
+		// Преобразуем ActiveUser в ActiveUserInfo
+		activeUserInfos := make([]dto.ActiveUserInfo, 0, len(activeUsers))
+		for _, activeUser := range activeUsers {
+			user, err := h.userRepo.GetUserByID(activeUser.ID)
+			if err != nil {
+				continue // Пропускаем пользователей, которых не можем найти
+			}
+			activeUserInfos = append(activeUserInfos, dto.ActiveUserInfo{
+				ID:       activeUser.ID.String(),
+				Username: user.Username,
+			})
+		}
+
+		resp.Channels = append(resp.Channels, dto.NewChannelResponseFromModel(ch, activeUserInfos))
 	}
 
 	return c.JSON(http.StatusOK, resp)

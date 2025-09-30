@@ -103,23 +103,33 @@ func (s *signalingUsecase) HandleJoin(ctx context.Context, userID uuid.UUID, joi
 func (s *signalingUsecase) BroadcastActiveMembers(ctx context.Context, channelID uuid.UUID) error {
 	activeUsers := s.activeUserRepo.GetInChannel(ctx, channelID)
 
-	activeMembers := events.ParticipantListEvent{List: make([]string, 0, len(activeUsers))}
+	// Создаем детальную информацию об участниках
+	participants := make([]events.ParticipantInfo, 0, len(activeUsers))
 
 	for _, activeUser := range activeUsers {
 		user, err := s.userRepo.GetUserByID(activeUser.ID)
 		if err != nil {
 			continue // Skip users that can't be found
 		}
-		activeMembers.List = append(activeMembers.List, user.Username)
+
+		// Добавляем в новый детальный формат
+		participants = append(participants, events.ParticipantInfo{
+			ID:       activeUser.ID.String(),
+			Username: user.Username,
+			IsMuted:  false, // TODO: получать из состояния пользователя
+			IsOnline: true,
+		})
 	}
 
-	activeMembersDataJSON, err := json.Marshal(activeMembers)
+	// Отправляем новый детальный формат
+	detailedParticipants := events.ParticipantListDetailedEvent{Participants: participants}
+	detailedParticipantsDataJSON, err := json.Marshal(detailedParticipants)
 	if err != nil {
-		return fmt.Errorf("marshal active members: %w", err)
+		return fmt.Errorf("marshal detailed participants: %w", err)
 	}
 
 	for _, activeUser := range activeUsers {
-		s.wsRepo.Write(activeUser.ID, events.Message{Type: "participants", Data: activeMembersDataJSON})
+		s.wsRepo.Write(activeUser.ID, events.Message{Type: "participants_detailed", Data: detailedParticipantsDataJSON})
 	}
 
 	return nil
@@ -229,6 +239,11 @@ func (s *signalingUsecase) HandleMute(ctx context.Context, userID uuid.UUID, isM
 			continue
 		}
 		s.wsRepo.Write(activeUser.ID, events.Message{Type: "user_action", Data: userActionEvent})
+	}
+
+	// Отправляем обновленный список участников после изменения статуса микрофона
+	if err := s.BroadcastActiveMembers(ctx, peer.ChannelID); err != nil {
+		return fmt.Errorf("broadcast active members after mute: %w", err)
 	}
 
 	return nil

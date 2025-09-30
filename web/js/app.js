@@ -4,6 +4,7 @@ import {getAudioDevices, updateAudioDevices, updateOutputDevice} from './devices
 import {initializeWebRTC, createOffer} from './webrtc.js';
 import {initializeWebSocket, handleWSMessage} from './websocket.js';
 import {toggleMute} from './ui.js';
+import {AudioActivityDetector} from './audio-activity.js';
 
 window.app = function () {
     return {
@@ -24,7 +25,10 @@ window.app = function () {
         pc: null,
         localStream: null,
         participants: [],
+        detailedParticipants: [],
         remoteAudioElements: [],
+        audioActivityDetector: null,
+        isSpeaking: false,
         showDeleteModal: false,
         channelIDToDelete: '',
         channelNameToDelete: '',
@@ -116,6 +120,7 @@ window.app = function () {
         },
         async refreshChannels() {
             this.channels = await getChannels();
+            console.log('Channels after refresh:', this.channels);
         },
         openDeleteModal(channel) {
             this.channelIDToDelete = channel.id;
@@ -165,6 +170,17 @@ window.app = function () {
                 const {pc, localStream} = await initializeWebRTC(this.ws, this.localStream, this.selectedInputDevice, this.selectedOutputDevice, this.remoteAudioElements);
                 this.pc = pc;
                 this.localStream = localStream;
+                
+                // Инициализируем детектор активности аудио
+                if (this.localStream) {
+                    this.audioActivityDetector = new AudioActivityDetector(
+                        this.localStream,
+                        (isSpeaking) => {
+                            this.isSpeaking = isSpeaking;
+                        }
+                    );
+                }
+                
                 await createOffer(this.pc, this.ws);
             } catch (err) {
                 console.error('Connection error:', err);
@@ -179,7 +195,7 @@ window.app = function () {
             }, 30000);
         },
         onWsMessage(event) {
-            handleWSMessage(event, this.pc, this.updateParticipants.bind(this), this.disconnect.bind(this));
+            handleWSMessage(event, this.pc, this.updateParticipants.bind(this), this.updateDetailedParticipants.bind(this), this.disconnect.bind(this));
         },
         onWsClose() {
             clearInterval(this.pingInterval);
@@ -193,6 +209,10 @@ window.app = function () {
 
         updateParticipants(participants) {
             this.participants = participants;
+        },
+
+        updateDetailedParticipants(participants) {
+            this.detailedParticipants = participants;
         },
 
         toggleMute() {
@@ -209,6 +229,11 @@ window.app = function () {
                 this.ws.send(JSON.stringify({type: "leave"}));
             }
 
+            if (this.audioActivityDetector) {
+                this.audioActivityDetector.stop();
+                this.audioActivityDetector = null;
+            }
+
             if (this.localStream) {
                 this.localStream.getTracks().forEach(track => track.stop());
                 this.localStream = null;
@@ -221,6 +246,7 @@ window.app = function () {
             }
             this.remoteAudioElements = [];
             this.currentChannelID = '';
+            this.detailedParticipants = [];
             
             // Обновляем список каналов после отключения
             this.refreshChannels();
