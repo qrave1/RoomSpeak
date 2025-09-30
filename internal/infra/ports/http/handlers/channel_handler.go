@@ -9,15 +9,17 @@ import (
 
 	"github.com/qrave1/RoomSpeak/internal/application/constant"
 	"github.com/qrave1/RoomSpeak/internal/domain/input"
+	postrepo "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/dto"
-	postrepo "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 	"github.com/qrave1/RoomSpeak/internal/usecase"
 )
 
 type ChannelHandler struct {
 	channelUsecase usecase.ChannelUsecase
-	userRepo       postrepo.UserRepository
+
+	// TODO убрать отсюда репу
+	userRepo postrepo.UserRepository
 }
 
 func NewChannelHandler(channelUsecase usecase.ChannelUsecase, userRepo postrepo.UserRepository) *ChannelHandler {

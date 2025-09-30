@@ -1,8 +1,8 @@
-import {checkAuth, login, register, logout} from './auth.js';
-import {getChannels, createChannel, deleteChannel} from './channels.js';
+import {checkAuth, login, logout, register} from './auth.js';
+import {createChannel, deleteChannel, getChannels} from './channels.js';
 import {getAudioDevices, updateAudioDevices, updateOutputDevice} from './devices.js';
-import {initializeWebRTC, createOffer} from './webrtc.js';
-import {initializeWebSocket, handleWSMessage} from './websocket.js';
+import {createOffer, initializeWebRTC} from './webrtc.js';
+import {handleWSMessage, initializeWebSocket} from './websocket.js';
 import {toggleMute} from './ui.js';
 import {AudioActivityDetector} from './audio-activity.js';
 
@@ -74,7 +74,7 @@ window.app = function () {
                 this.onWsClose.bind(this),
                 this.onWsError.bind(this)
             );
-            
+
             // Автоматическое обновление списка каналов каждые 3 секунды
             this.channelsRefreshInterval = setInterval(async () => {
                 if (this.isAuthenticated) {
@@ -167,10 +167,13 @@ window.app = function () {
                     type: 'join',
                     data: {name: this.name, channel_id: this.currentChannelID}
                 }));
-                const {pc, localStream} = await initializeWebRTC(this.ws, this.localStream, this.selectedInputDevice, this.selectedOutputDevice, this.remoteAudioElements);
+                const {
+                    pc,
+                    localStream
+                } = await initializeWebRTC(this.ws, this.localStream, this.selectedInputDevice, this.selectedOutputDevice, this.remoteAudioElements);
                 this.pc = pc;
                 this.localStream = localStream;
-                
+
                 // Инициализируем детектор активности аудио
                 if (this.localStream) {
                     this.audioActivityDetector = new AudioActivityDetector(
@@ -180,9 +183,9 @@ window.app = function () {
                         }
                     );
                 }
-                
+
                 await createOffer(this.pc, this.ws);
-                
+
                 // Обновляем список каналов после подключения
                 await this.refreshChannels();
             } catch (err) {
@@ -254,7 +257,7 @@ window.app = function () {
             this.remoteAudioElements = [];
             this.currentChannelID = '';
             this.detailedParticipants = [];
-            
+
             // Обновляем список каналов после отключения
             setTimeout(() => {
                 this.refreshChannels();
