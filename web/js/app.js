@@ -75,12 +75,12 @@ window.app = function () {
                 this.onWsError.bind(this)
             );
             
-            // Автоматическое обновление списка каналов каждые 5 секунд
+            // Автоматическое обновление списка каналов каждые 3 секунды
             this.channelsRefreshInterval = setInterval(async () => {
-                if (this.isAuthenticated && !this.pc) {
+                if (this.isAuthenticated) {
                     await this.refreshChannels();
                 }
-            }, 5000);
+            }, 3000);
         },
 
         // Auth
@@ -120,7 +120,6 @@ window.app = function () {
         },
         async refreshChannels() {
             this.channels = await getChannels();
-            console.log('Channels after refresh:', this.channels);
         },
         openDeleteModal(channel) {
             this.channelIDToDelete = channel.id;
@@ -163,6 +162,7 @@ window.app = function () {
             }
 
             try {
+                console.log('Connecting to channel:', this.currentChannelID, 'as user:', this.name);
                 this.ws.send(JSON.stringify({
                     type: 'join',
                     data: {name: this.name, channel_id: this.currentChannelID}
@@ -182,6 +182,9 @@ window.app = function () {
                 }
                 
                 await createOffer(this.pc, this.ws);
+                
+                // Обновляем список каналов после подключения
+                await this.refreshChannels();
             } catch (err) {
                 console.error('Connection error:', err);
             }
@@ -213,6 +216,10 @@ window.app = function () {
 
         updateDetailedParticipants(participants) {
             this.detailedParticipants = participants;
+            // Обновляем список каналов при изменении участников
+            setTimeout(() => {
+                this.refreshChannels();
+            }, 500);
         },
 
         toggleMute() {
@@ -249,7 +256,9 @@ window.app = function () {
             this.detailedParticipants = [];
             
             // Обновляем список каналов после отключения
-            this.refreshChannels();
+            setTimeout(() => {
+                this.refreshChannels();
+            }, 1000); // Небольшая задержка, чтобы сервер успел обновить состояние
         }
     }
 }

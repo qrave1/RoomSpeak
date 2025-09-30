@@ -62,7 +62,6 @@ export async function handleWSMessage(event, pc, updateParticipants, updateDetai
             disconnect();
             break;
         case 'pong':
-            console.log('Pong received');
             break;
 
         default:

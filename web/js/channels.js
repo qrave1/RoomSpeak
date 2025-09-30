@@ -5,7 +5,6 @@ export async function getChannels() {
             throw new Error('Network response was not ok');
         }
         const data = await response.json();
-        console.log('Channels data from backend:', data);
         return data.channels;
     } catch (err) {
         console.error('Error getting channels:', err);
