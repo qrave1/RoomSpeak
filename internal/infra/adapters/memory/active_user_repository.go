@@ -10,30 +10,30 @@ import (
 
 type ActiveUserRepository interface {
 	// Add an active user to a channel
-	Add(ctx context.Context, activeUser *runtime.ActiveUser)
+	Add(ctx context.Context, activeUser runtime.ActiveUser)
 
 	// Remove an active user from a channel
 	Remove(ctx context.Context, userID uuid.UUID)
 
 	// Get all active users in a channel
-	GetInChannel(ctx context.Context, channelID uuid.UUID) []*runtime.ActiveUser
+	GetInChannel(ctx context.Context, channelID uuid.UUID) []runtime.ActiveUser
 
 	// Get active user by ID
-	GetByID(ctx context.Context, userID uuid.UUID) (*runtime.ActiveUser, bool)
+	GetByID(ctx context.Context, userID uuid.UUID) (runtime.ActiveUser, bool)
 }
 
 type activeUserRepository struct {
-	activeUsers map[uuid.UUID]*runtime.ActiveUser
+	activeUsers map[uuid.UUID]runtime.ActiveUser
 	mu          sync.RWMutex
 }
 
 func NewActiveUserRepository() ActiveUserRepository {
 	return &activeUserRepository{
-		activeUsers: make(map[uuid.UUID]*runtime.ActiveUser),
+		activeUsers: make(map[uuid.UUID]runtime.ActiveUser),
 	}
 }
 
-func (r *activeUserRepository) Add(ctx context.Context, activeUser *runtime.ActiveUser) {
+func (r *activeUserRepository) Add(ctx context.Context, activeUser runtime.ActiveUser) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -47,11 +47,11 @@ func (r *activeUserRepository) Remove(ctx context.Context, userID uuid.UUID) {
 	delete(r.activeUsers, userID)
 }
 
-func (r *activeUserRepository) GetInChannel(ctx context.Context, channelID uuid.UUID) []*runtime.ActiveUser {
+func (r *activeUserRepository) GetInChannel(ctx context.Context, channelID uuid.UUID) []runtime.ActiveUser {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var activeUsers []*runtime.ActiveUser
+	var activeUsers []runtime.ActiveUser
 
 	for _, activeUser := range r.activeUsers {
 		if activeUser.ChannelID == channelID {
@@ -62,7 +62,7 @@ func (r *activeUserRepository) GetInChannel(ctx context.Context, channelID uuid.
 	return activeUsers
 }
 
-func (r *activeUserRepository) GetByID(ctx context.Context, userID uuid.UUID) (*runtime.ActiveUser, bool) {
+func (r *activeUserRepository) GetByID(ctx context.Context, userID uuid.UUID) (runtime.ActiveUser, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

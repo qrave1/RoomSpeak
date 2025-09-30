@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"github.com/qrave1/RoomSpeak/internal/domain/runtime"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
 
 	"github.com/google/uuid"
 
@@ -19,16 +21,18 @@ type ChannelUsecase interface {
 
 	AddUserToChannel(ctx context.Context, userID, channelID uuid.UUID) error
 	RemoveUserFromChannel(ctx context.Context, userID, channelID uuid.UUID) error
-	GetChannelsByUserID(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error)
-	GetPublicChannels(ctx context.Context) ([]*models.Channel, error)
+	GetAvailableChannelsForUser(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error)
+
+	GetActiveUsersByID(ctx context.Context, channelID uuid.UUID) []runtime.ActiveUser
 }
 
 type channelUsecase struct {
-	channelRepo repository.ChannelRepository
+	channelRepo    repository.ChannelRepository
+	activeUserRepo memory.ActiveUserRepository
 }
 
-func NewChannelUsecase(channelRepo repository.ChannelRepository) ChannelUsecase {
-	return &channelUsecase{channelRepo: channelRepo}
+func NewChannelUsecase(channelRepo repository.ChannelRepository, activeUserRepo memory.ActiveUserRepository) ChannelUsecase {
+	return &channelUsecase{channelRepo: channelRepo, activeUserRepo: activeUserRepo}
 }
 
 func (uc *channelUsecase) CreateChannel(ctx context.Context, input *input.CreateChannelInput) (*models.Channel, error) {
@@ -75,10 +79,10 @@ func (uc *channelUsecase) RemoveUserFromChannel(ctx context.Context, userID, cha
 	return uc.channelRepo.RemoveUserFromChannel(ctx, userID, channelID)
 }
 
-func (uc *channelUsecase) GetChannelsByUserID(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error) {
-	return uc.channelRepo.GetChannelsByUserID(ctx, userID)
+func (uc *channelUsecase) GetAvailableChannelsForUser(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error) {
+	return uc.channelRepo.GetAvailableChannelsForUser(ctx, userID)
 }
 
-func (uc *channelUsecase) GetPublicChannels(ctx context.Context) ([]*models.Channel, error) {
-	return uc.channelRepo.GetPublicChannels(ctx)
+func (uc *channelUsecase) GetActiveUsersByID(ctx context.Context, channelID uuid.UUID) []runtime.ActiveUser {
+	return uc.activeUserRepo.GetInChannel(ctx, channelID)
 }

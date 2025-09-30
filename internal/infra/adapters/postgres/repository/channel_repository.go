@@ -18,8 +18,7 @@ type ChannelRepository interface {
 	AddUserToChannel(ctx context.Context, userID, channelID uuid.UUID) error
 	RemoveUserFromChannel(ctx context.Context, userID, channelID uuid.UUID) error
 
-	GetChannelsByUserID(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error)
-	GetPublicChannels(ctx context.Context) ([]*models.Channel, error)
+	GetAvailableChannelsForUser(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error)
 }
 
 type channelRepo struct {
@@ -82,34 +81,18 @@ func (r *channelRepo) RemoveUserFromChannel(ctx context.Context, userID, channel
 	return err
 }
 
-func (r *channelRepo) GetChannelsByUserID(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error) {
+func (r *channelRepo) GetAvailableChannelsForUser(ctx context.Context, userID uuid.UUID) ([]*models.Channel, error) {
 	var channels []*models.Channel
 
 	query := `
-		SELECT c.*
+		SELECT DISTINCT c.*
 		FROM channels c
-		INNER JOIN channel_users cu ON c.id = cu.channel_id
-		WHERE cu.user_id = $1
+		LEFT JOIN channel_users cu ON c.id = cu.channel_id AND cu.user_id = $1
+		WHERE c.is_public = true OR cu.user_id = $1
+		ORDER BY c.created_at DESC
 	`
 
 	err := r.db.SelectContext(ctx, &channels, query, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return channels, nil
-}
-
-func (r *channelRepo) GetPublicChannels(ctx context.Context) ([]*models.Channel, error) {
-	var channels []*models.Channel
-
-	query := `
-		SELECT c.*
-		FROM channels c
-		WHERE c.is_public = true
-	`
-
-	err := r.db.SelectContext(ctx, &channels, query)
 	if err != nil {
 		return nil, err
 	}

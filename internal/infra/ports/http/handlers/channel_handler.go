@@ -29,29 +29,22 @@ func (h *ChannelHandler) ListChannelsHandler(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
 	}
 
-	userChannels, err := h.channelUsecase.GetChannelsByUserID(c.Request().Context(), userID)
+	// Получаем все доступные каналы для пользователя (приватные + публичные)
+	availableChannels, err := h.channelUsecase.GetAvailableChannelsForUser(c.Request().Context(), userID)
 	if err != nil {
-		slog.Error("get channels by user id", slog.Any(constant.Error, err))
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get channels"})
-	}
-
-	publicChannels, err := h.channelUsecase.GetPublicChannels(c.Request().Context())
-	if err != nil {
-		slog.Error("get public channels", slog.Any(constant.Error, err))
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get public channels"})
+		slog.Error("get available channels for user", slog.Any(constant.Error, err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get available channels"})
 	}
 
 	resp := dto.ListChannelsResponse{
-		Channels: make([]dto.ChannelResponse, 0, len(publicChannels)+len(userChannels)),
+		Channels: make([]dto.ChannelResponse, 0, len(availableChannels)),
 	}
 
-	for _, ch := range publicChannels {
-		resp.Channels = append(resp.Channels, dto.NewChannelResponseFromModel(ch, nil))
-	}
+	for _, ch := range availableChannels {
+		actives := h.channelUsecase.GetActiveUsersByID(c.Request().Context(), ch.ID)
 
-	//resp.Channels = append(resp.Channels, publicChannels...)
-	//
-	//resp.Channels = append(resp.Channels, userChannels...)
+		resp.Channels = append(resp.Channels, dto.NewChannelResponseFromModel(ch, actives))
+	}
 
 	return c.JSON(http.StatusOK, resp)
 }

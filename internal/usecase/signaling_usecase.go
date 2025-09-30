@@ -87,7 +87,7 @@ func (s *signalingUsecase) HandleJoin(ctx context.Context, userID uuid.UUID, joi
 
 	s.pcRepo.Add(userID, peer)
 
-	activeUser := &runtime.ActiveUser{
+	activeUser := runtime.ActiveUser{
 		ID:        userID,
 		ChannelID: channelID,
 	}
