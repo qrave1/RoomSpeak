@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"github.com/qrave1/RoomSpeak/internal/domain/models"
 	"log/slog"
 	"net/http"
 
@@ -43,12 +42,16 @@ func (h *ChannelHandler) ListChannelsHandler(c echo.Context) error {
 	}
 
 	resp := dto.ListChannelsResponse{
-		Channels: make([]*models.Channel, 0, len(publicChannels)+len(userChannels)),
+		Channels: make([]dto.ChannelResponse, 0, len(publicChannels)+len(userChannels)),
 	}
 
-	resp.Channels = append(resp.Channels, publicChannels...)
+	for _, ch := range publicChannels {
+		resp.Channels = append(resp.Channels, dto.NewChannelResponseFromModel(ch, nil))
+	}
 
-	resp.Channels = append(resp.Channels, userChannels...)
+	//resp.Channels = append(resp.Channels, publicChannels...)
+	//
+	//resp.Channels = append(resp.Channels, userChannels...)
 
 	return c.JSON(http.StatusOK, resp)
 }

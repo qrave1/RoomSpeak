@@ -24,22 +24,22 @@ type PeerUsecase interface {
 type peerUsecase struct {
 	cfg *config.Config
 
-	pcRepo             memory.PeerConnectionRepository
-	wsRepo             memory.WebsocketConnectionRepository
-	channelMembersRepo memory.ChannelMembersRepository
+	pcRepo         memory.PeerConnectionRepository
+	wsRepo         memory.WebsocketConnectionRepository
+	activeUserRepo memory.ActiveUserRepository
 }
 
 func NewPeerUsecase(
 	cfg *config.Config,
 	pcRepo memory.PeerConnectionRepository,
 	wsRepo memory.WebsocketConnectionRepository,
-	channelMembersRepo memory.ChannelMembersRepository,
+	activeUserRepo memory.ActiveUserRepository,
 ) *peerUsecase {
 	return &peerUsecase{
-		cfg:                cfg,
-		pcRepo:             pcRepo,
-		wsRepo:             wsRepo,
-		channelMembersRepo: channelMembersRepo,
+		cfg:            cfg,
+		pcRepo:         pcRepo,
+		wsRepo:         wsRepo,
+		activeUserRepo: activeUserRepo,
 	}
 }
 
@@ -81,32 +81,18 @@ func (p *peerUsecase) CreateWebrtcPeer(ctx context.Context, userID uuid.UUID, ch
 		p.wsRepo.Write(userID, map[string]any{"type": "candidate", "candidate": c.ToJSON()})
 	})
 
-	//peer.Conn.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-	//	if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateDisconnected {
-	//		slog.Error("PeerConnection bad status",
-	//			slog.String(constant.State, state.String()),
-	//			slog.Any(constant.UserID, userID),
-	//		)
-	//
-	//		p.wsRepo.Write(userID, map[string]any{
-	//			"type":    constant.Error,
-	//			"message": fmt.Sprintf("peer connection bad state: %s", state.String()),
-	//		})
-	//	}
-	//})
-
 	return peer, nil
 }
 
 func (p *peerUsecase) broadcastRTP(ctx context.Context, pkt *rtp.Packet, userID uuid.UUID, channelID uuid.UUID) {
-	members := p.channelMembersRepo.GetMembers(ctx, channelID)
+	activeUsers := p.activeUserRepo.GetInChannel(ctx, channelID)
 
-	for _, member := range members {
-		if member.ID == userID {
+	for _, activeUser := range activeUsers {
+		if activeUser.ID == userID {
 			continue
 		}
 
-		pc, ok := p.pcRepo.Get(member.ID)
+		pc, ok := p.pcRepo.Get(activeUser.ID)
 		if !ok {
 			slog.Error("get peer connection in broadcast")
 			continue

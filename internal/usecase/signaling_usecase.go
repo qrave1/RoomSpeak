@@ -10,6 +10,7 @@ import (
 	"github.com/pion/webrtc/v4"
 	"github.com/qrave1/RoomSpeak/internal/application/constant"
 	"github.com/qrave1/RoomSpeak/internal/domain/events"
+	"github.com/qrave1/RoomSpeak/internal/domain/runtime"
 	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
 	postrepo "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 )
@@ -32,9 +33,9 @@ type signalingUsecase struct {
 	channelRepo postrepo.ChannelRepository
 	userRepo    postrepo.UserRepository
 
-	pcRepo             memory.PeerConnectionRepository
-	wsRepo             memory.WebsocketConnectionRepository
-	channelMembersRepo memory.ChannelMembersRepository
+	pcRepo         memory.PeerConnectionRepository
+	wsRepo         memory.WebsocketConnectionRepository
+	activeUserRepo memory.ActiveUserRepository
 
 	peerUsecase PeerUsecase
 }
@@ -44,16 +45,16 @@ func NewSignalingUsecase(
 	userRepo postrepo.UserRepository,
 	pcRepo memory.PeerConnectionRepository,
 	wsRepo memory.WebsocketConnectionRepository,
-	channelMembersRepo memory.ChannelMembersRepository,
+	activeUserRepo memory.ActiveUserRepository,
 	peerUsecase PeerUsecase,
 ) SignalingUsecase {
 	return &signalingUsecase{
-		channelRepo:        channelRepo,
-		userRepo:           userRepo,
-		pcRepo:             pcRepo,
-		wsRepo:             wsRepo,
-		channelMembersRepo: channelMembersRepo,
-		peerUsecase:        peerUsecase,
+		channelRepo:    channelRepo,
+		userRepo:       userRepo,
+		pcRepo:         pcRepo,
+		wsRepo:         wsRepo,
+		activeUserRepo: activeUserRepo,
+		peerUsecase:    peerUsecase,
 	}
 }
 
@@ -86,12 +87,11 @@ func (s *signalingUsecase) HandleJoin(ctx context.Context, userID uuid.UUID, joi
 
 	s.pcRepo.Add(userID, peer)
 
-	user, err := s.userRepo.GetUserByID(userID)
-	if err != nil {
-		return fmt.Errorf("get user from postgres: %w", err)
+	activeUser := &runtime.ActiveUser{
+		ID:        userID,
+		ChannelID: channelID,
 	}
-
-	s.channelMembersRepo.AddMember(ctx, channelID, user)
+	s.activeUserRepo.Add(ctx, activeUser)
 
 	if err = s.BroadcastActiveMembers(ctx, channelID); err != nil {
 		return fmt.Errorf("broadcast active members: %w", err)
@@ -100,25 +100,26 @@ func (s *signalingUsecase) HandleJoin(ctx context.Context, userID uuid.UUID, joi
 	return nil
 }
 
-// TODO: переделать нейминг говна
 func (s *signalingUsecase) BroadcastActiveMembers(ctx context.Context, channelID uuid.UUID) error {
+	activeUsers := s.activeUserRepo.GetInChannel(ctx, channelID)
 
-	members := s.channelMembersRepo.GetMembers(ctx, channelID)
+	activeMembers := events.ParticipantListEvent{List: make([]string, 0, len(activeUsers))}
 
-	activeMembers := events.ParticipantListEvent{List: make([]string, 0, len(members))}
-
-	for _, member := range members {
-		activeMembers.List = append(activeMembers.List, member.Username)
+	for _, activeUser := range activeUsers {
+		user, err := s.userRepo.GetUserByID(activeUser.ID)
+		if err != nil {
+			continue // Skip users that can't be found
+		}
+		activeMembers.List = append(activeMembers.List, user.Username)
 	}
 
 	activeMembersDataJSON, err := json.Marshal(activeMembers)
 	if err != nil {
 		return fmt.Errorf("marshal active members: %w", err)
-
 	}
 
-	for _, member := range members {
-		s.wsRepo.Write(member.ID, events.Message{Type: "participants", Data: activeMembersDataJSON})
+	for _, activeUser := range activeUsers {
+		s.wsRepo.Write(activeUser.ID, events.Message{Type: "participants", Data: activeMembersDataJSON})
 	}
 
 	return nil
@@ -130,7 +131,7 @@ func (s *signalingUsecase) HandleLeave(ctx context.Context, userID uuid.UUID) er
 		return fmt.Errorf("peer connection not found")
 	}
 
-	s.channelMembersRepo.RemoveMember(ctx, peer.ChannelID, userID)
+	s.activeUserRepo.Remove(ctx, userID)
 
 	s.pcRepo.Remove(userID)
 
@@ -208,7 +209,7 @@ func (s *signalingUsecase) HandleMute(ctx context.Context, userID uuid.UUID, isM
 		return fmt.Errorf("peer connection not found")
 	}
 
-	members := s.channelMembersRepo.GetMembers(ctx, peer.ChannelID)
+	activeUsers := s.activeUserRepo.GetInChannel(ctx, peer.ChannelID)
 
 	user, err := s.userRepo.GetUserByID(userID)
 	if err != nil {
@@ -223,11 +224,11 @@ func (s *signalingUsecase) HandleMute(ctx context.Context, userID uuid.UUID, isM
 		return fmt.Errorf("marshal user action event: %w", err)
 	}
 
-	for _, member := range members {
-		if member.ID == userID {
+	for _, activeUser := range activeUsers {
+		if activeUser.ID == userID {
 			continue
 		}
-		s.wsRepo.Write(member.ID, events.Message{Type: "user_action", Data: userActionEvent})
+		s.wsRepo.Write(activeUser.ID, events.Message{Type: "user_action", Data: userActionEvent})
 	}
 
 	return nil
