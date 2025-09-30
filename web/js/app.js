@@ -20,6 +20,7 @@ window.app = function () {
         selectedOutputDevice: '',
         ws: null,
         pingInterval: null,
+        channelsRefreshInterval: null,
         pc: null,
         localStream: null,
         participants: [],
@@ -69,6 +70,13 @@ window.app = function () {
                 this.onWsClose.bind(this),
                 this.onWsError.bind(this)
             );
+            
+            // Автоматическое обновление списка каналов каждые 5 секунд
+            this.channelsRefreshInterval = setInterval(async () => {
+                if (this.isAuthenticated && !this.pc) {
+                    await this.refreshChannels();
+                }
+            }, 5000);
         },
 
         // Auth
@@ -85,6 +93,15 @@ window.app = function () {
             }
         },
         logout() {
+            // Очищаем все интервалы при выходе
+            if (this.pingInterval) {
+                clearInterval(this.pingInterval);
+                this.pingInterval = null;
+            }
+            if (this.channelsRefreshInterval) {
+                clearInterval(this.channelsRefreshInterval);
+                this.channelsRefreshInterval = null;
+            }
             logout();
         },
 
@@ -94,8 +111,11 @@ window.app = function () {
             if (success) {
                 this.newChannelName = '';
                 this.newChannelIsPublic = false;
-                this.channels = await getChannels();
+                await this.refreshChannels();
             }
+        },
+        async refreshChannels() {
+            this.channels = await getChannels();
         },
         openDeleteModal(channel) {
             this.channelIDToDelete = channel.id;
@@ -105,7 +125,7 @@ window.app = function () {
         async confirmDelete() {
             const success = await deleteChannel(this.channelIDToDelete);
             if (success) {
-                this.channels = await getChannels();
+                await this.refreshChannels();
             }
             this.showDeleteModal = false;
             this.channelIDToDelete = '';
@@ -201,6 +221,9 @@ window.app = function () {
             }
             this.remoteAudioElements = [];
             this.currentChannelID = '';
+            
+            // Обновляем список каналов после отключения
+            this.refreshChannels();
         }
     }
 }

@@ -19,55 +19,63 @@
 <body x-data="app()" x-init="init()" class="text-white">
 
 <!-- Auth Screen -->
-<div x-show="!isAuthenticated" class="flex items-center justify-center h-screen">
-    <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-sm">
+<div x-show="!isAuthenticated" class="flex items-center justify-center h-screen bg-gray-900">
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-sm">
         <!-- Login Form -->
         <div x-show="showLogin">
-            <h2 class="text-2xl font-bold mb-6 text-center">Login</h2>
-            <form @submit.prevent="login()">
-                <div class="mb-4">
-                    <label for="login-username" class="block text-sm font-medium text-gray-400">Username</label>
-                    <input type="text" id="login-username" x-model="auth.username"
-                           class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-comments text-white"></i>
                 </div>
-                <div class="mb-6">
-                    <label for="login-password" class="block text-sm font-medium text-gray-400">Password</label>
-                    <input type="password" id="login-password" x-model="auth.password"
-                           class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <h2 class="text-xl font-semibold text-gray-200">Welcome back</h2>
+                <p class="text-sm text-gray-400 mt-1">Sign in to your account</p>
+            </div>
+            <form @submit.prevent="login()" class="space-y-4">
+                <div>
+                    <input type="text" id="login-username" x-model="auth.username" placeholder="Username"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <input type="password" id="login-password" x-model="auth.password" placeholder="Password"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
                 <button type="submit"
-                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
-                    Login
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded text-sm transition-colors">
+                    Sign In
                 </button>
             </form>
-            <p class="text-center text-sm text-gray-400 mt-4">
+            <p class="text-center text-xs text-gray-400 mt-4">
                 Don't have an account?
-                <button @click="showLogin = false" class="text-indigo-400 hover:underline">Register</button>
+                <button @click="showLogin = false" class="text-indigo-400 hover:underline">Sign up</button>
             </p>
         </div>
 
         <!-- Registration Form -->
         <div x-show="!showLogin">
-            <h2 class="text-2xl font-bold mb-6 text-center">Register</h2>
-            <form @submit.prevent="register()">
-                <div class="mb-4">
-                    <label for="register-username" class="block text-sm font-medium text-gray-400">Username</label>
-                    <input type="text" id="register-username" x-model="auth.username"
-                           class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i class="fas fa-user-plus text-white"></i>
                 </div>
-                <div class="mb-6">
-                    <label for="register-password" class="block text-sm font-medium text-gray-400">Password</label>
-                    <input type="password" id="register-password" x-model="auth.password"
-                           class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <h2 class="text-xl font-semibold text-gray-200">Create account</h2>
+                <p class="text-sm text-gray-400 mt-1">Join RoomSpeak today</p>
+            </div>
+            <form @submit.prevent="register()" class="space-y-4">
+                <div>
+                    <input type="text" id="register-username" x-model="auth.username" placeholder="Username"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <input type="password" id="register-password" x-model="auth.password" placeholder="Password"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
                 <button type="submit"
-                        class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                    Register
+                        class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded text-sm transition-colors">
+                    Create Account
                 </button>
             </form>
-            <p class="text-center text-sm text-gray-400 mt-4">
+            <p class="text-center text-xs text-gray-400 mt-4">
                 Already have an account?
-                <button @click="showLogin = true" class="text-indigo-400 hover:underline">Login</button>
+                <button @click="showLogin = true" class="text-indigo-400 hover:underline">Sign in</button>
             </p>
         </div>
     </div>
@@ -77,69 +85,109 @@
 <!-- Main App -->
 <div x-show="isAuthenticated" class="flex h-screen">
     <!-- Sidebar -->
-    <div class="w-64 bg-gray-800 p-4 flex flex-col">
-        <h3 class="text-xl font-bold mb-4">Channels</h3>
-        <ul class="space-y-2 flex-grow">
-            <template x-for="channel in channels">
-                <li class="flex items-center justify-between bg-gray-700 p-2 rounded">
-                    <span x-text="channel.name"></span>
-                    <div>
-                        <button @click="joinChannel(channel)"
-                                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-1 px-2 rounded">
-                            <i class="fas fa-sign-in-alt"></i>
-                        </button>
-                        <button @click="deleteChannel(channel)"
-                                class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 rounded ml-2">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </li>
-            </template>
-        </ul>
-        <div class="mt-4">
-            <h3 class="text-xl font-bold mb-2">Your Name</h3>
-            <div class="relative">
-                <span x-text="name" class="pl-10 pr-4 py-2 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white"></span>
-                <i class="fas fa-user absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+    <div class="w-60 bg-gray-800 flex flex-col">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+            <h3 class="text-sm font-semibold text-gray-200 uppercase tracking-wide">Channels</h3>
+            <button @click="refreshChannels()" class="text-gray-400 hover:text-white transition-colors p-1" title="Refresh channels">
+                <i class="fas fa-sync-alt text-xs"></i>
+            </button>
+        </div>
+        
+        <!-- Channels List -->
+        <div class="flex-1 overflow-y-auto">
+            <ul class="px-2 py-2 space-y-1">
+                <template x-for="channel in channels">
+                    <li class="group">
+                        <div class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-700 transition-colors">
+                            <div class="flex items-center flex-1 min-w-0">
+                                <div class="flex items-center space-x-2 flex-1 min-w-0">
+                                    <span x-text="channel.name" class="text-sm text-gray-300 truncate"></span>
+                                    <span x-show="channel.active_members.length > 0" 
+                                          class="text-xs text-gray-500 bg-gray-600 px-1.5 py-0.5 rounded-full"
+                                          x-text="channel.active_members.length"></span>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button @click="joinChannel(channel)"
+                                        class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-600 transition-colors"
+                                        title="Join channel">
+                                    <i class="fas fa-sign-in-alt text-xs"></i>
+                                </button>
+                                <button @click="openDeleteModal(channel)"
+                                        class="text-gray-400 hover:text-red-400 p-1 rounded hover:bg-gray-600 transition-colors"
+                                        title="Delete channel">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Active Members - Compact -->
+                        <div x-show="channel.active_members.length > 0" class="px-4 pb-1">
+                            <div class="flex items-center space-x-2">
+                                <template x-for="member in channel.active_members.slice(0, 3)">
+                                    <div class="flex items-center space-x-1">
+                                        <div class="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+                                        <span x-text="member.username" class="text-xs text-gray-500"></span>
+                                    </div>
+                                </template>
+                                <span x-show="channel.active_members.length > 3" 
+                                      class="text-xs text-gray-500"
+                                      x-text="'+' + (channel.active_members.length - 3)"></span>
+                            </div>
+                        </div>
+                    </li>
+                </template>
+            </ul>
+        </div>
+        
+        <!-- User Info -->
+        <div class="px-4 py-3 border-t border-gray-700">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+                    <i class="fas fa-user text-xs text-gray-300"></i>
+                </div>
+                <span x-text="name" class="text-sm text-gray-300 truncate"></span>
             </div>
         </div>
-        <div class="mt-4">
-            <h3 class="text-xl font-bold mb-2">Create Channel</h3>
-            <div class="relative">
-                <input type="text" x-model="newChannelName" placeholder="Channel Name"
-                       class="pl-10 pr-4 py-2 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                <i class="fas fa-plus absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+        
+        <!-- Create Channel -->
+        <div class="px-4 py-3 border-t border-gray-700">
+            <div class="space-y-2">
+                <div class="relative">
+                    <input type="text" x-model="newChannelName" placeholder="Channel Name"
+                           class="w-full px-3 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="newChannelIsPublic" 
+                               class="mr-2 bg-gray-700 border-gray-600 rounded text-indigo-600 focus:ring-indigo-500 focus:ring-1">
+                        <span class="text-xs text-gray-400">Public</span>
+                    </label>
+                    <button @click="createChannel()"
+                            class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors">
+                        Create
+                    </button>
+                </div>
             </div>
-            <div class="mt-2">
-                <label class="flex items-center">
-                    <input type="checkbox" x-model="newChannelIsPublic" 
-                           class="mr-2 bg-gray-700 border-gray-600 rounded text-indigo-600 focus:ring-indigo-500 focus:ring-2">
-                    <span class="text-sm text-gray-400">Сделать канал публичным</span>
-                </label>
-            </div>
-            <button @click="createChannel()"
-                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mt-2">
-                Create
-            </button>
         </div>
 
         <!-- Settings -->
-        <div class="mt-4 border-t border-gray-700 pt-4">
-            <h3 class="text-xl font-bold mb-2">Settings</h3>
+        <div class="px-4 py-3 border-t border-gray-700">
             <div class="space-y-2">
                 <div>
-                    <label for="audio-input" class="block text-sm font-medium text-gray-400">Audio Input</label>
+                    <label for="audio-input" class="block text-xs font-medium text-gray-400 mb-1">Audio Input</label>
                     <select id="audio-input" x-model="selectedInputDevice" @change="updateAudioDevices()"
-                            class="mt-1 block w-full pl-3 pr-10 py-2 bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
                         <template x-for="device in audioInputDevices">
                             <option :value="device.deviceId" x-text="device.label"></option>
                         </template>
                     </select>
                 </div>
                 <div>
-                    <label for="audio-output" class="block text-sm font-medium text-gray-400">Audio Output</label>
+                    <label for="audio-output" class="block text-xs font-medium text-gray-400 mb-1">Audio Output</label>
                     <select id="audio-output" x-model="selectedOutputDevice" @change="updateOutputDevice()"
-                            class="mt-1 block w-full pl-3 pr-10 py-2 bg-gray-700 border-gray-600 rounded-md shadow-sm text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
                         <template x-for="device in audioOutputDevices">
                             <option :value="device.deviceId" x-text="device.label"></option>
                         </template>
@@ -147,40 +195,57 @@
                 </div>
             </div>
         </div>
-         <div class="mt-4 border-t border-gray-700 pt-4">
+        
+        <!-- Logout -->
+        <div class="px-4 py-3 border-t border-gray-700">
             <button @click="logout()"
-                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                    class="w-full px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors">
                 Logout
             </button>
         </div>
     </div>
 
     <!-- Main Content -->
-    <div class="flex-grow flex items-center justify-center p-4">
-        <div x-show="!pc" class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
-            <h1 class="text-2xl font-bold mb-6 text-center">Welcome to RoomSpeak</h1>
-            <p class="text-center text-gray-400">Select a channel to join or create a new one.</p>
+    <div class="flex-grow bg-gray-900 flex items-center justify-center">
+        <div x-show="!pc" class="text-center">
+            <div class="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-comments text-2xl text-gray-400"></i>
+            </div>
+            <h1 class="text-xl font-semibold text-gray-200 mb-2">Welcome to RoomSpeak</h1>
+            <p class="text-gray-400 text-sm">Select a channel to join or create a new one.</p>
         </div>
 
-        <div x-show="pc" class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4">Participants in  <b><span x-text="currentChannelName"></span></b></h3>
-            <ul class="space-y-2 flex-grow">
-                <template x-for="participant in participants">
-                    <li class="flex items-center bg-gray-700 p-2 rounded">
-                        <i class="fas fa-user mr-2"></i>
-                        <span x-html="participant"></span>
-                    </li>
-                </template>
-            </ul>
-            <button id="mute-btn" @click="toggleMute()"
-                    class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mt-4">
-                <i class="fas fa-microphone"></i>
-            </button>
-            <button @click="disconnect()"
-                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mt-4">
-                <i class="fas fa-phone-slash mr-2"></i>
-                Disconnect
-            </button>
+        <div x-show="pc" class="w-full max-w-md">
+            <div class="bg-gray-800 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-200">
+                        <span x-text="currentChannelName"></span>
+                    </h3>
+                    <button @click="disconnect()"
+                            class="text-gray-400 hover:text-red-400 transition-colors"
+                            title="Disconnect">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-2 mb-4">
+                    <div class="text-sm text-gray-400 mb-2">Participants</div>
+                    <div class="space-y-1">
+                        <template x-for="participant in participants">
+                            <div class="flex items-center space-x-2 text-sm text-gray-300">
+                                <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                                <span x-html="participant"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <button id="mute-btn" @click="toggleMute()"
+                        class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded transition-colors">
+                    <i class="fas fa-microphone mr-2"></i>
+                    <span x-text="isMuted ? 'Unmute' : 'Mute'"></span>
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -189,15 +254,15 @@
 <div x-show="showDeleteModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center"
      style="display: none;">
     <div class="bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-sm">
-        <h3 class="text-xl font-bold mb-4">Delete Channel</h3>
-        <p>Are you sure you want to delete the channel "<span x-text="channelNameToDelete"></span>"?</p>
-        <div class="mt-6 flex justify-end space-x-4">
+        <h3 class="text-lg font-semibold text-gray-200 mb-3">Delete Channel</h3>
+        <p class="text-gray-300 text-sm mb-6">Are you sure you want to delete the channel "<span x-text="channelNameToDelete" class="font-medium"></span>"?</p>
+        <div class="flex justify-end space-x-3">
             <button @click="showDeleteModal = false"
-                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded transition-colors">
                 Cancel
             </button>
             <button @click="confirmDelete()"
-                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded transition-colors">
                 Delete
             </button>
         </div>
