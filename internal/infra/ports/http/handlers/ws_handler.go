@@ -101,6 +101,8 @@ func (h *WebSocketHandler) Handle(c echo.Context) error {
 			if err != nil {
 				h.handleWebsocketError(c.Request().Context(), err)
 
+				// TODO: пробовать достать channel_id из ctx
+
 				if err = h.signalingUsecase.HandleLeave(c.Request().Context(), userID); err != nil {
 					slog.Error(
 						"handle leave while reading websocket message",

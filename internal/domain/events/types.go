@@ -27,9 +27,17 @@ type IceCandidateEvent struct {
 	Candidate webrtc.ICECandidateInit `json:"candidate"`
 }
 
-// ParticipantListEvent - событие со списком активных участников комнаты
-type ParticipantListEvent struct {
-	List []string `json:"list"`
+// ParticipantInfo - информация об участнике
+type ParticipantInfo struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	IsMuted  bool   `json:"is_muted"`
+	IsOnline bool   `json:"is_online"`
+}
+
+// ParticipantListDetailedEvent - событие с детальной информацией об участниках
+type ParticipantListDetailedEvent struct {
+	Participants []ParticipantInfo `json:"participants"`
 }
 
 // UserActionEvent - событие, связанное с действием пользователя, например, отключение микрофона

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"github.com/qrave1/RoomSpeak/internal/domain/models"
 	"log/slog"
 	"net/http"
 
@@ -12,15 +11,17 @@ import (
 	"github.com/qrave1/RoomSpeak/internal/domain/input"
 	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/dto"
+	postrepo "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 	"github.com/qrave1/RoomSpeak/internal/usecase"
 )
 
 type ChannelHandler struct {
 	channelUsecase usecase.ChannelUsecase
+	userRepo       postrepo.UserRepository
 }
 
-func NewChannelHandler(channelUsecase usecase.ChannelUsecase) *ChannelHandler {
-	return &ChannelHandler{channelUsecase: channelUsecase}
+func NewChannelHandler(channelUsecase usecase.ChannelUsecase, userRepo postrepo.UserRepository) *ChannelHandler {
+	return &ChannelHandler{channelUsecase: channelUsecase, userRepo: userRepo}
 }
 
 func (h *ChannelHandler) ListChannelsHandler(c echo.Context) error {
@@ -30,25 +31,39 @@ func (h *ChannelHandler) ListChannelsHandler(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user"})
 	}
 
-	userChannels, err := h.channelUsecase.GetChannelsByUserID(c.Request().Context(), userID)
+	// Получаем все доступные каналы для пользователя (приватные + публичные)
+	availableChannels, err := h.channelUsecase.GetAvailableChannelsForUser(c.Request().Context(), userID)
 	if err != nil {
-		slog.Error("get channels by user id", slog.Any(constant.Error, err))
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get channels"})
-	}
-
-	publicChannels, err := h.channelUsecase.GetPublicChannels(c.Request().Context())
-	if err != nil {
-		slog.Error("get public channels", slog.Any(constant.Error, err))
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get public channels"})
+		slog.Error("get available channels for user", slog.Any(constant.Error, err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to get available channels"})
 	}
 
 	resp := dto.ListChannelsResponse{
-		Channels: make([]*models.Channel, 0, len(publicChannels)+len(userChannels)),
+		Channels: make([]dto.ChannelResponse, 0, len(availableChannels)),
 	}
 
-	resp.Channels = append(resp.Channels, publicChannels...)
+	for _, ch := range availableChannels {
+		activeUsers, err := h.channelUsecase.GetActiveUsersByID(c.Request().Context(), ch.ID)
+		if err != nil {
+			slog.Error("get active users by id", slog.Any(constant.Error, err))
+			continue
+		}
 
-	resp.Channels = append(resp.Channels, userChannels...)
+		// Преобразуем ActiveUser в ActiveUserInfo
+		activeUserInfos := make([]dto.ActiveUserInfo, 0, len(activeUsers))
+		for _, activeUser := range activeUsers {
+			user, err := h.userRepo.GetUserByID(activeUser.ID)
+			if err != nil {
+				continue // Пропускаем пользователей, которых не можем найти
+			}
+			activeUserInfos = append(activeUserInfos, dto.ActiveUserInfo{
+				ID:       activeUser.ID.String(),
+				Username: user.Username,
+			})
+		}
+
+		resp.Channels = append(resp.Channels, dto.NewChannelResponseFromModel(ch, activeUserInfos))
+	}
 
 	return c.JSON(http.StatusOK, resp)
 }
