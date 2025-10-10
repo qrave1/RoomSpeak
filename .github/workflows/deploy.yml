@@ -3,6 +3,8 @@ name: CI/CD
 on:
   push:
     branches: [ "master" ] # деплой при пуше в master
+  workflow_dispatch:   # запуск вручную
+
 
 permissions:
   contents: read
