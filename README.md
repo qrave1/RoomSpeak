@@ -2,6 +2,10 @@
 
 ## Voice Chat Application
 
+### TODO List
+- [ ] Auto reconnects for ws + peer
+- [ ] 
+
 ### Tech List
 
 - [ ] Github CI/CD
@@ -20,6 +24,8 @@
 - [ ] Voice activity detection via WebRTC Data Channels
 - [ ] Channel messaging via WebRTC Data Channels
 - [ ] Frontend for mobile
+- [ ] Standalone app
+- [ ] Password change
 
 ## Docker
 
