@@ -1,8 +1,12 @@
-name: CI/CD Deploy
+name: CI/CD
 
 on:
   push:
     branches: [ "master" ] # деплой при пуше в master
+
+permissions:
+  contents: read
+  packages: write
 
 env:
   REGISTRY: ghcr.io/qrave1/roomspeak
