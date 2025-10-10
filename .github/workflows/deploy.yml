@@ -1,0 +1,91 @@
+name: CI/CD Deploy
+
+on:
+  push:
+    branches: [ "master" ] # деплой при пуше в master
+
+env:
+  REGISTRY: ghcr.io/qrave1/roomspeak
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Task
+        uses: arduino/setup-task@v2
+        with:
+          version: latest
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set build timestamp
+        id: vars
+        run: echo "BUILD_TIMESTAMP=$(date +%Y_%m_%d_%H_%M_%S)" >> $GITHUB_ENV
+
+      - name: Run build and push tasks
+        run: |
+          task push
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: REGISTRY,BUILD_TIMESTAMP,COMPOSE_PATH
+          script: |
+            set -e
+            echo "📦 Starting deployment..."
+            BACKUP_PATH="${COMPOSE_PATH}.bak_$(date +%Y_%m_%d_%H_%M_%S)"
+
+            echo "🧩 Backing up current docker-compose.yml..."
+            cp $COMPOSE_PATH $BACKUP_PATH
+
+            echo "🔧 Updating images to $REGISTRY:$BUILD_TIMESTAMP"
+            yq -i '.services.roomspeak.image = strenv(REGISTRY) + ":" + strenv(BUILD_TIMESTAMP)' $COMPOSE_PATH
+            yq -i '.services.migrate.image = strenv(REGISTRY) + ":" + strenv(BUILD_TIMESTAMP)' $COMPOSE_PATH
+
+            echo "📥 Pulling new images..."
+            docker compose -f $COMPOSE_PATH pull
+
+            echo "🚀 Restarting roomspeak service..."
+            if docker compose -f $COMPOSE_PATH up -d roomspeak; then
+              echo "✅ Deployment succeeded."
+              docker image prune -f
+            else
+              echo "❌ Deployment failed! Rolling back..."
+              cp $BACKUP_PATH $COMPOSE_PATH
+              docker compose -f $COMPOSE_PATH pull
+              docker compose -f $COMPOSE_PATH up -d roomspeak
+              echo "↩️ Rolled back to previous version."
+              exit 1
+            fi
+      - name: Send Telegram notification
+        if: always()
+        uses: appleboy/telegram-action@v1.0.0
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            📣 *Roomspeak Deployment Report*
+            
+            *Status:* ${{ job.status }}
+            *Commit:* ${{ github.sha }}
+            *Tag:* ${{ env.BUILD_TIMESTAMP }}
+            *Repository:* ${{ github.repository }}
+            
+            ${{ job.status == 'success' && '✅ Deployment completed successfully.' || '⚠️ Deployment failed and rolled back.' }}
