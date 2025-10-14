@@ -5,3 +5,6 @@
 .env
 
 vps/
+
+node_modules
+dist
