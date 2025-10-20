@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/labstack/echo/v4"
+	emiddleware "github.com/labstack/echo/v4/middleware"
 
 	"github.com/qrave1/RoomSpeak/internal/application/config"
 	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/handlers"
@@ -16,6 +17,15 @@ func New(
 	wsHandler *handlers.WebSocketHandler,
 ) *echo.Echo {
 	e := echo.New()
+
+	e.Use(
+		emiddleware.CORSWithConfig(
+			emiddleware.CORSConfig{
+				AllowOrigins:     []string{cfg.Domain},
+				AllowCredentials: true,
+			},
+		),
+	)
 
 	//e.Use(middleware.SlogLogger())
 
@@ -39,6 +49,8 @@ func New(
 			v1.GET("/channels", channelHandler.ListChannelsHandler)
 			v1.POST("/channels", channelHandler.CreateChannelHandler)
 			v1.DELETE("/channels/:id", channelHandler.DeleteChannelHandler)
+
+			v1.GET("/users/online", authHandler.GetOnlineUsers)
 		}
 	}
 

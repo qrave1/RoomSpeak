@@ -1,7 +1,17 @@
+# IDE
 .idea/
 .cursor/
 .gemini/
 
+# ENV
 .env
 
+# DEPLOY DATA
 vps/
+
+# FRONT
+
+web-vue/node_modules
+web-vue/dist
+web-vue/.env
+web-vue/.env.production

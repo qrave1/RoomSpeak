@@ -16,6 +16,7 @@ type WebsocketConnectionRepository interface {
 	Remove(uuid uuid.UUID)
 
 	Write(uuid.UUID, any)
+	GetAllConnected() []uuid.UUID
 }
 
 type safeWS struct {
@@ -76,4 +77,17 @@ func (w *wsConnectionRepository) getSafeWS(userID uuid.UUID) (*safeWS, bool) {
 
 	conn, ok := w.wsConns[userID]
 	return conn, ok
+}
+
+func (w *wsConnectionRepository) GetAllConnected() []uuid.UUID {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	userIDs := make([]uuid.UUID, 0, len(w.wsConns))
+
+	for userID := range w.wsConns {
+		userIDs = append(userIDs, userID)
+	}
+
+	return userIDs
 }

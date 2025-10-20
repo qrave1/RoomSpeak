@@ -1,0 +1,11 @@
+services:
+  vue-app:
+    build: .
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    # Optional: Add volumes for live reloading in development
+    # volumes:
+    #   - ./dist:/usr/share/nginx/html:ro

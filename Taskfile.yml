@@ -1,30 +1,30 @@
 version: "3"
 
-dotenv: [".env"]
+dotenv: [ ".env" ]
 
 vars:
   REGISTRY: "ghcr.io/qrave1/roomspeak"
   COMPOSE_FILE: deploy/docker-compose.yml
   BUILD_TIMESTAMP:
     sh: date +%Y_%m_%d_%H_%M_%S
+  BACK_TAG: "{{.REGISTRY}}:{{.BUILD_TIMESTAMP}}_backend"
+  FRONT_TAG: "{{.REGISTRY}}:{{.BUILD_TIMESTAMP}}_frontend"
 
 tasks:
-  build:
+  back:build:
     desc: Build Docker image with timestamp tag
     cmds:
-      - docker build -t {{.REGISTRY}}:{{.BUILD_TIMESTAMP}} .
-      - docker tag {{.REGISTRY}}:{{.BUILD_TIMESTAMP}} {{.REGISTRY}}:latest
+      - docker build -t {{.BACK_TAG}} .
 
-  push:
+  back:push:
     desc: Build and push Docker image to registry
-    deps: [build]
+    deps: [ back:build ]
     cmds:
-      - docker push {{.REGISTRY}}:{{.BUILD_TIMESTAMP}}
-      - docker push {{.REGISTRY}}:latest
+      - docker push {{.BACK_TAG}}
 
-  deploy:
+  back:deploy:
     desc: Build, push, update deployment.yaml and apply
-    deps: [push]
+    deps: [ back:push ]
   #    cmds: TODO
 
   # Migrations
@@ -46,3 +46,23 @@ tasks:
     cmds:
       - echo "Start dev app"
       - docker compose --file {{.COMPOSE_FILE}} --profile app up -d --build
+
+  # FRONTEND
+  front:run:
+    desc: Run Vue Frontend
+    dir: web-vue/
+    cmds:
+      - npm run dev
+
+  front:build:
+    desc: Build Docker image with timestamp tag
+    dir: web-vue/
+    cmds:
+      - docker build -t {{.FRONT_TAG}} .
+
+  front:push:
+    desc: Build Docker image with timestamp tag
+    dir: web-vue/
+    deps: [ front:build ]
+    cmds:
+      - docker push {{.FRONT_TAG}}
