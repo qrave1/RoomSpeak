@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"github.com/qrave1/RoomSpeak/internal/domain/output"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -9,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/qrave1/RoomSpeak/internal/domain/models"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
 	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 )
 
@@ -24,19 +26,31 @@ type UserUsecase interface {
 	// Аутентификация
 	ValidateCredentials(ctx context.Context, username, password string) (*models.User, error)
 	GenerateJWT(user *models.User) (string, error)
+
+	// Онлайн пользователи
+	GetOnlineUsers(ctx context.Context) ([]output.OnlineUserInfo, error)
 }
 
 type userUsecase struct {
 	jwtSecret []byte
 
-	userRepo repository.UserRepository
+	userRepo    repository.UserRepository
+	channelRepo repository.ChannelRepository
+	wsRepo      memory.WebsocketConnectionRepository
 }
 
 // NewUserUsecase создает новый экземпляр UserUsecase
-func NewUserUsecase(jwtSecret []byte, userRepo repository.UserRepository) UserUsecase {
+func NewUserUsecase(
+	jwtSecret []byte,
+	userRepo repository.UserRepository,
+	channelRepo repository.ChannelRepository,
+	wsRepo memory.WebsocketConnectionRepository,
+) UserUsecase {
 	return &userUsecase{
-		jwtSecret: jwtSecret,
-		userRepo:  userRepo,
+		jwtSecret:   jwtSecret,
+		userRepo:    userRepo,
+		channelRepo: channelRepo,
+		wsRepo:      wsRepo,
 	}
 }
 
@@ -101,4 +115,29 @@ func (uc *userUsecase) GenerateJWT(user *models.User) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(uc.jwtSecret)
+}
+
+// GetOnlineUsers получает список всех онлайн пользователей
+func (uc *userUsecase) GetOnlineUsers(ctx context.Context) ([]output.OnlineUserInfo, error) {
+	// Получаем всех подключенных по WebSocket пользователей
+	connectedUserIDs := uc.wsRepo.GetAllConnected()
+
+	result := make([]output.OnlineUserInfo, 0, len(connectedUserIDs))
+
+	for _, userID := range connectedUserIDs {
+		// Получаем информацию о пользователе
+		user, err := uc.userRepo.GetUserByID(userID)
+		if err != nil {
+			continue // Пропускаем пользователей, которых не можем найти
+		}
+
+		info := output.OnlineUserInfo{
+			ID:       user.ID.String(),
+			Username: user.Username,
+		}
+
+		result = append(result, info)
+	}
+
+	return result, nil
 }

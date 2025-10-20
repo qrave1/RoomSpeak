@@ -46,3 +46,9 @@ tasks:
     cmds:
       - echo "Start dev app"
       - docker compose --file {{.COMPOSE_FILE}} --profile app up -d --build
+
+  front:
+    desc: Run Vue Frontend
+    dir: web-vue/
+    cmds:
+      - npm run dev

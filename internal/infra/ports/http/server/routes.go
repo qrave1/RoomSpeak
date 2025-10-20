@@ -39,6 +39,8 @@ func New(
 			v1.GET("/channels", channelHandler.ListChannelsHandler)
 			v1.POST("/channels", channelHandler.CreateChannelHandler)
 			v1.DELETE("/channels/:id", channelHandler.DeleteChannelHandler)
+
+			v1.GET("/users/online", authHandler.GetOnlineUsers)
 		}
 	}
 

@@ -86,3 +86,13 @@ func (h *AuthHandler) GetMe(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, resp)
 }
+
+func (h *AuthHandler) GetOnlineUsers(c echo.Context) error {
+	onlineUsers, err := h.userUsecase.GetOnlineUsers(c.Request().Context())
+	if err != nil {
+		slog.Error("get online users failed", slog.Any(constant.Error, err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "could not get online users"})
+	}
+
+	return c.JSON(http.StatusOK, onlineUsers)
+}

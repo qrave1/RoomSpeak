@@ -33,3 +33,41 @@ export interface CreateChannelRequest {
   is_public: boolean
 }
 
+export interface Participant {
+  id: string
+  username: string
+  is_muted: boolean
+}
+
+export interface ICEServer {
+  urls: string | string[]
+  username?: string
+  credential?: string
+}
+
+export interface ICEServerResponse {
+  urls: string
+  username: string
+  credential: string
+}
+
+export interface WSMessage {
+  type: string
+  data?: any
+  message?: string
+  candidate?: RTCIceCandidateInit
+  sdp?: string
+}
+
+export interface AudioDevice {
+  deviceId: string
+  label: string
+  kind: string
+}
+
+export interface OnlineUser {
+  id: string
+  username: string
+  channel_id?: string
+  channel_name?: string
+}

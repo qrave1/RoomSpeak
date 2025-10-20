@@ -1,4 +1,4 @@
-import type { User, LoginRequest, RegisterRequest, Channel, CreateChannelRequest } from '@/types'
+import type { User, LoginRequest, RegisterRequest, Channel, CreateChannelRequest, OnlineUser } from '@/types'
 
 const API_BASE = '/api'
 
@@ -94,6 +94,21 @@ class ApiService {
     } catch (err) {
       console.error('Error deleting channel:', err)
       return false
+    }
+  }
+
+  // Online users endpoints
+  async getOnlineUsers(): Promise<OnlineUser[]> {
+    try {
+      const response = await fetch(`${API_BASE}/v1/users/online`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch online users')
+      }
+      const data = await response.json()
+      return data || []
+    } catch (err) {
+      console.error('Error getting online users:', err)
+      return []
     }
   }
 }

@@ -50,7 +50,7 @@ func runApp() {
 	pcConnRepo := memory.NewPeerConnectionRepository()
 	activeUserRepo := memory.NewActiveUserRepository()
 
-	userUsecase := usecase.NewUserUsecase([]byte(cfg.JWTSecret), userRepo)
+	userUsecase := usecase.NewUserUsecase([]byte(cfg.JWTSecret), userRepo, channelRepo, wsConnRepo)
 	channelUsecase := usecase.NewChannelUsecase(channelRepo, activeUserRepo)
 	peerUsecase := usecase.NewPeerUsecase(cfg, pcConnRepo, wsConnRepo, activeUserRepo)
 	signalingUsecase := usecase.NewSignalingUsecase(channelRepo, userRepo, pcConnRepo, wsConnRepo, activeUserRepo, peerUsecase)
