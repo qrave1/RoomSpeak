@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-
 	"github.com/qrave1/RoomSpeak/internal/application/constant"
 	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/dto"
@@ -59,10 +58,12 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	c.SetCookie(&http.Cookie{
 		Name:     "jwt",
 		Value:    token,
-		Expires:  time.Now().Add(time.Hour * 72),
+		Expires:  time.Now().Add(72 * time.Hour),
+		Domain:   ".xxsm.ru",
 		Path:     "/",
 		Secure:   true,
 		HttpOnly: true,
+		SameSite: http.SameSiteNoneMode,
 	})
 
 	return c.NoContent(http.StatusOK)

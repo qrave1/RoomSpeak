@@ -1,12 +1,15 @@
 import type { User, LoginRequest, RegisterRequest, Channel, CreateChannelRequest, OnlineUser } from '@/types'
+import { env } from '@/config/env'
 
-const API_BASE = '/api'
+const API_BASE = `${env.backendUrl}/api`
 
 class ApiService {
   // Auth endpoints
   async checkAuth(): Promise<{ isAuthenticated: boolean; user?: User }> {
     try {
-      const response = await fetch(`${API_BASE}/v1/me`)
+      const response = await fetch(`${API_BASE}/v1/me`, {
+        credentials: 'include'
+      })
       if (response.ok) {
         const user = await response.json()
         return { isAuthenticated: true, user }
@@ -25,7 +28,8 @@ class ApiService {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify(credentials),
+        credentials: 'include'
       })
       return response.ok
     } catch (err) {
@@ -41,7 +45,8 @@ class ApiService {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify(credentials),
+        credentials: 'include'
       })
       return response.ok
     } catch (err) {
@@ -57,7 +62,9 @@ class ApiService {
   // Channel endpoints
   async getChannels(): Promise<Channel[]> {
     try {
-      const response = await fetch(`${API_BASE}/v1/channels`)
+      const response = await fetch(`${API_BASE}/v1/channels`, {
+        credentials: 'include'
+      })
       if (!response.ok) {
         throw new Error('Network response was not ok')
       }
@@ -76,7 +83,8 @@ class ApiService {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(channel)
+        body: JSON.stringify(channel),
+        credentials: 'include'
       })
       return response.ok
     } catch (err) {
@@ -88,7 +96,8 @@ class ApiService {
   async deleteChannel(channelId: string): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE}/v1/channels/${channelId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       })
       return response.ok
     } catch (err) {
@@ -100,7 +109,9 @@ class ApiService {
   // Online users endpoints
   async getOnlineUsers(): Promise<OnlineUser[]> {
     try {
-      const response = await fetch(`${API_BASE}/v1/users/online`)
+      const response = await fetch(`${API_BASE}/v1/users/online`, {
+        credentials: 'include'
+      })
       if (!response.ok) {
         throw new Error('Failed to fetch online users')
       }

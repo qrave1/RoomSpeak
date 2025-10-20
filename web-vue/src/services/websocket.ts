@@ -1,5 +1,5 @@
 import type {WSMessage} from '@/types'
-import {env} from '@/config'
+import {env} from '@/config/env'
 
 export class WebSocketService {
     private ws: WebSocket | null = null
@@ -74,10 +74,6 @@ export class WebSocketService {
             clearInterval(this.pingInterval)
             this.pingInterval = null
         }
-    }
-
-    getSocket(): WebSocket | null {
-        return this.ws
     }
 
     isConnected(): boolean {

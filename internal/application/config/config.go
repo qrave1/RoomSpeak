@@ -10,7 +10,7 @@ import (
 type Config struct {
 	Debug     bool   `env:"DEBUG" envDefault:"false"`
 	Port      string `env:"PORT" envDefault:"3000"`
-	Domain    string `env:"DOMAIN" envDefault:"https://xxsm.ru"`
+	Domain    string `env:"DOMAIN" envDefault:"http://localhost:3000"`
 	JWTSecret string `env:"JWT_SECRET,required"`
 
 	TurnUDPServer webrtc.ICEServer
