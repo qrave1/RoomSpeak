@@ -13,24 +13,27 @@ vars:
 tasks:
   back:build:
     desc: Build Docker image with timestamp tag
+    dir: backend/
     cmds:
       - docker build -t {{.BACK_TAG}} .
 
   back:push:
     desc: Build and push Docker image to registry
+    dir: backend/
     deps: [ back:build ]
     cmds:
       - docker push {{.BACK_TAG}}
 
   back:deploy:
     desc: Build, push, update deployment.yaml and apply
+    dir: backend/
     deps: [ back:push ]
   #    cmds: TODO
 
   # Migrations
   migrate:create:
     desc: Create a new goose migration
-    dir: internal/infra/postgres/migrations
+    dir: backend/internal/infra/postgres/migrations
     cmds:
       - goose create {{.CLI_ARGS}} sql
 
@@ -39,13 +42,13 @@ tasks:
     desc: Run Infrastructure
     cmds:
       - echo "Start dev environment"
-      - docker compose --file {{.COMPOSE_FILE}} --profile infra up -d
+      - docker compose --file backend/{{.COMPOSE_FILE}} --profile infra up -d
 
   app:
     desc: Run Application
     cmds:
       - echo "Start dev app"
-      - docker compose --file {{.COMPOSE_FILE}} --profile app up -d --build
+      - docker compose --file backend/{{.COMPOSE_FILE}} --profile app up -d --build
 
   # FRONTEND
   front:run:
