@@ -11,7 +11,7 @@ import (
 	"github.com/qrave1/RoomSpeak/internal/application/constant"
 	"github.com/qrave1/RoomSpeak/internal/domain/events"
 	"github.com/qrave1/RoomSpeak/internal/domain/runtime"
-	memory2 "github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
 	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 )
 
@@ -33,9 +33,9 @@ type signalingUsecase struct {
 	channelRepo repository.ChannelRepository
 	userRepo    repository.UserRepository
 
-	pcRepo         memory2.PeerConnectionRepository
-	wsRepo         memory2.WebsocketConnectionRepository
-	activeUserRepo memory2.ActiveUserRepository
+	pcRepo         memory.PeerConnectionRepository
+	wsRepo         memory.WebsocketConnectionRepository
+	activeUserRepo memory.ActiveUserRepository
 
 	peerUsecase PeerUsecase
 }
@@ -43,9 +43,9 @@ type signalingUsecase struct {
 func NewSignalingUsecase(
 	channelRepo repository.ChannelRepository,
 	userRepo repository.UserRepository,
-	pcRepo memory2.PeerConnectionRepository,
-	wsRepo memory2.WebsocketConnectionRepository,
-	activeUserRepo memory2.ActiveUserRepository,
+	pcRepo memory.PeerConnectionRepository,
+	wsRepo memory.WebsocketConnectionRepository,
+	activeUserRepo memory.ActiveUserRepository,
 	peerUsecase PeerUsecase,
 ) SignalingUsecase {
 	return &signalingUsecase{

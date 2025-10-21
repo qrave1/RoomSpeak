@@ -6,11 +6,12 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/qrave1/RoomSpeak/internal/domain/models"
 	"github.com/qrave1/RoomSpeak/internal/domain/output"
 	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
-	repository2 "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 )
 
 // UserUsecase определяет интерфейс для работы с пользователями
@@ -33,16 +34,16 @@ type UserUsecase interface {
 type userUsecase struct {
 	jwtSecret []byte
 
-	userRepo    repository2.UserRepository
-	channelRepo repository2.ChannelRepository
+	userRepo    repository.UserRepository
+	channelRepo repository.ChannelRepository
 	wsRepo      memory.WebsocketConnectionRepository
 }
 
 // NewUserUsecase создает новый экземпляр UserUsecase
 func NewUserUsecase(
 	jwtSecret []byte,
-	userRepo repository2.UserRepository,
-	channelRepo repository2.ChannelRepository,
+	userRepo repository.UserRepository,
+	channelRepo repository.ChannelRepository,
 	wsRepo memory.WebsocketConnectionRepository,
 ) UserUsecase {
 	return &userUsecase{

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+
 	"github.com/qrave1/RoomSpeak/internal/application/metric"
 )
 

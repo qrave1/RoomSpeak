@@ -10,10 +10,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
+
 	"github.com/qrave1/RoomSpeak/internal/application/config"
 	"github.com/qrave1/RoomSpeak/internal/application/constant"
 	"github.com/qrave1/RoomSpeak/internal/domain"
-	memory2 "github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
 )
 
 type PeerUsecase interface {
@@ -23,16 +24,16 @@ type PeerUsecase interface {
 type peerUsecase struct {
 	cfg *config.Config
 
-	pcRepo         memory2.PeerConnectionRepository
-	wsRepo         memory2.WebsocketConnectionRepository
-	activeUserRepo memory2.ActiveUserRepository
+	pcRepo         memory.PeerConnectionRepository
+	wsRepo         memory.WebsocketConnectionRepository
+	activeUserRepo memory.ActiveUserRepository
 }
 
 func NewPeerUsecase(
 	cfg *config.Config,
-	pcRepo memory2.PeerConnectionRepository,
-	wsRepo memory2.WebsocketConnectionRepository,
-	activeUserRepo memory2.ActiveUserRepository,
+	pcRepo memory.PeerConnectionRepository,
+	wsRepo memory.WebsocketConnectionRepository,
+	activeUserRepo memory.ActiveUserRepository,
 ) *peerUsecase {
 	return &peerUsecase{
 		cfg:            cfg,

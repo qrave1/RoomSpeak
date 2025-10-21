@@ -10,15 +10,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
+	"github.com/labstack/echo/v4"
+	
 	"github.com/qrave1/RoomSpeak/internal/application/config"
 	"github.com/qrave1/RoomSpeak/internal/application/constant"
 	"github.com/qrave1/RoomSpeak/internal/domain/events"
 	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
 	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"github.com/qrave1/RoomSpeak/internal/usecase"
-
-	"github.com/gorilla/websocket"
-	"github.com/labstack/echo/v4"
 )
 
 type WebSocketHandler struct {

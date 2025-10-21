@@ -10,12 +10,12 @@ import (
 	"github.com/qrave1/RoomSpeak/internal/application/config"
 	"github.com/qrave1/RoomSpeak/internal/application/constant"
 	"github.com/qrave1/RoomSpeak/internal/application/metric"
-	memory2 "github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
 	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres"
-	repository2 "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
-	handlers2 "github.com/qrave1/RoomSpeak/internal/infra/ports/http/handlers"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
+	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/handlers"
 	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/server"
-	usecase2 "github.com/qrave1/RoomSpeak/internal/usecase"
+	"github.com/qrave1/RoomSpeak/internal/usecase"
 )
 
 func runApp() {
@@ -45,21 +45,21 @@ func runApp() {
 	}
 	defer dbConn.Close()
 
-	userRepo := repository2.NewUserRepo(dbConn)
-	channelRepo := repository2.NewChannelRepo(dbConn)
-	wsConnRepo := memory2.NewWSConnectionRepository()
-	pcConnRepo := memory2.NewPeerConnectionRepository()
-	activeUserRepo := memory2.NewActiveUserRepository()
+	userRepo := repository.NewUserRepo(dbConn)
+	channelRepo := repository.NewChannelRepo(dbConn)
+	wsConnRepo := memory.NewWSConnectionRepository()
+	pcConnRepo := memory.NewPeerConnectionRepository()
+	activeUserRepo := memory.NewActiveUserRepository()
 
-	userUsecase := usecase2.NewUserUsecase([]byte(cfg.JWTSecret), userRepo, channelRepo, wsConnRepo)
-	channelUsecase := usecase2.NewChannelUsecase(channelRepo, activeUserRepo)
-	peerUsecase := usecase2.NewPeerUsecase(cfg, pcConnRepo, wsConnRepo, activeUserRepo)
-	signalingUsecase := usecase2.NewSignalingUsecase(channelRepo, userRepo, pcConnRepo, wsConnRepo, activeUserRepo, peerUsecase)
+	userUsecase := usecase.NewUserUsecase([]byte(cfg.JWTSecret), userRepo, channelRepo, wsConnRepo)
+	channelUsecase := usecase.NewChannelUsecase(channelRepo, activeUserRepo)
+	peerUsecase := usecase.NewPeerUsecase(cfg, pcConnRepo, wsConnRepo, activeUserRepo)
+	signalingUsecase := usecase.NewSignalingUsecase(channelRepo, userRepo, pcConnRepo, wsConnRepo, activeUserRepo, peerUsecase)
 
-	authHandler := handlers2.NewAuthHandler(userUsecase)
-	channelHandler := handlers2.NewChannelHandler(channelUsecase, userRepo)
-	iceHandler := handlers2.NewIceHandler(cfg)
-	wsHandler := handlers2.NewWebSocketHandler(cfg, signalingUsecase, wsConnRepo)
+	authHandler := handlers.NewAuthHandler(userUsecase)
+	channelHandler := handlers.NewChannelHandler(channelUsecase, userRepo)
+	iceHandler := handlers.NewIceHandler(cfg)
+	wsHandler := handlers.NewWebSocketHandler(cfg, signalingUsecase, wsConnRepo)
 
 	echoSrv := server.New(cfg, authHandler, channelHandler, iceHandler, wsHandler)
 
