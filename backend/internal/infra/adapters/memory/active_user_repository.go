@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/runtime"
+	"github.com/qrave1/RoomSpeak/internal/domain/runtime"
 )
 
 type ActiveUserRepository interface {

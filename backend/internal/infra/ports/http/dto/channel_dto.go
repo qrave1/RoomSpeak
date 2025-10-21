@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/models"
+	"github.com/qrave1/RoomSpeak/internal/domain/models"
 )
 
 type CreateChannelRequest struct {

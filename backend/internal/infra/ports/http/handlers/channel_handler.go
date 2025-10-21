@@ -6,12 +6,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/constant"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/input"
-	postrepo "github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/postgres/repository"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/appctx"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/ports/http/dto"
-	"github.com/qrave1/RoomSpeak/backend/internal/usecase"
+	"github.com/qrave1/RoomSpeak/internal/domain/input"
+	postrepo "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
+	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
+	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/dto"
+	"github.com/qrave1/RoomSpeak/internal/usecase"
+	"github.com/qrave1/RoomSpeak/internal/application/constant"
 )
 
 type ChannelHandler struct {

@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/config"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/constant"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/events"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/memory"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/appctx"
-	"github.com/qrave1/RoomSpeak/backend/internal/usecase"
+	"github.com/qrave1/RoomSpeak/internal/application/config"
+	"github.com/qrave1/RoomSpeak/internal/application/constant"
+	"github.com/qrave1/RoomSpeak/internal/domain/events"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
+	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
+	"github.com/qrave1/RoomSpeak/internal/usecase"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"

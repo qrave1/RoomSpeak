@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/appctx"
+	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 )
 
 func JWTAuthMiddleware(secret string) echo.MiddlewareFunc {

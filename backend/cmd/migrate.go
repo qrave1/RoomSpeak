@@ -5,9 +5,10 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/config"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/postgres/migrations"
 	"github.com/spf13/cobra"
+
+	"github.com/qrave1/RoomSpeak/internal/application/config"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/migrations"
 )
 
 var migrateCmd = &cobra.Command{

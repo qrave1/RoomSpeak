@@ -6,10 +6,10 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/models"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/output"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/memory"
-	repository2 "github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/postgres/repository"
+	"github.com/qrave1/RoomSpeak/internal/domain/models"
+	"github.com/qrave1/RoomSpeak/internal/domain/output"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
+	repository2 "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 

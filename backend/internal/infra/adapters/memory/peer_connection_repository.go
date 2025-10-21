@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain"
+	"github.com/qrave1/RoomSpeak/internal/domain"
 )
 
 type PeerConnectionRepository interface {

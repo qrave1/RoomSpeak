@@ -6,7 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/constant"
+	"github.com/qrave1/RoomSpeak/internal/application/constant"
+	"github.com/qrave1/RoomSpeak/internal/application/metric"
 )
 
 // WebsocketConnectionRepository интерфейс для работы с активными сессиями в памяти
@@ -41,13 +42,22 @@ func (w *wsConnectionRepository) Add(userID uuid.UUID, conn *websocket.Conn) {
 	defer w.mu.Unlock()
 
 	w.wsConns[userID] = &safeWS{conn: conn}
+
+	// Увеличиваем счетчик активных WS соединений
+	metric.IncrementWSActiveConnections()
 }
 
 func (w *wsConnectionRepository) Remove(userID uuid.UUID) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	delete(w.wsConns, userID)
+	// Проверяем, существует ли соединение перед удалением
+	if _, exists := w.wsConns[userID]; exists {
+		delete(w.wsConns, userID)
+
+		// Уменьшаем счетчик активных WS соединений
+		metric.DecrementWSActiveConnections()
+	}
 }
 
 func (w *wsConnectionRepository) Write(userID uuid.UUID, payload any) {

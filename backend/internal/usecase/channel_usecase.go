@@ -5,11 +5,11 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/input"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/models"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/runtime"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/memory"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/postgres/repository"
+	"github.com/qrave1/RoomSpeak/internal/domain/input"
+	"github.com/qrave1/RoomSpeak/internal/domain/models"
+	"github.com/qrave1/RoomSpeak/internal/domain/runtime"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 )
 
 type ChannelUsecase interface {

@@ -8,11 +8,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/constant"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/events"
-	"github.com/qrave1/RoomSpeak/backend/internal/domain/runtime"
-	memory2 "github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/memory"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/postgres/repository"
+	"github.com/qrave1/RoomSpeak/internal/application/constant"
+	"github.com/qrave1/RoomSpeak/internal/domain/events"
+	"github.com/qrave1/RoomSpeak/internal/domain/runtime"
+	memory2 "github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
 )
 
 type SignalingUsecase interface {

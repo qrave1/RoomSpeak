@@ -10,7 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/pion/webrtc/v4"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/config"
+	"github.com/qrave1/RoomSpeak/internal/application/config"
 )
 
 type IceHandler struct {

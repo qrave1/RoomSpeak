@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pion/webrtc/v4"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/config"
+	"github.com/qrave1/RoomSpeak/internal/application/config"
 )
 
 type Peer struct {

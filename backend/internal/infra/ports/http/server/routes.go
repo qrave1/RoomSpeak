@@ -3,19 +3,22 @@ package server
 import (
 	"github.com/labstack/echo/v4"
 	emiddleware "github.com/labstack/echo/v4/middleware"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/config"
-	handlers2 "github.com/qrave1/RoomSpeak/backend/internal/infra/ports/http/handlers"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/ports/http/middleware"
+
+	"github.com/qrave1/RoomSpeak/internal/application/config"
+	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/handlers"
+	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/middleware"
 )
 
 func New(
 	cfg *config.Config,
-	authHandler *handlers2.AuthHandler,
-	channelHandler *handlers2.ChannelHandler,
-	iceHandler *handlers2.IceHandler,
-	wsHandler *handlers2.WebSocketHandler,
+	authHandler *handlers.AuthHandler,
+	channelHandler *handlers.ChannelHandler,
+	iceHandler *handlers.IceHandler,
+	wsHandler *handlers.WebSocketHandler,
 ) *echo.Echo {
 	e := echo.New()
+
+	e.HideBanner = true
 
 	e.Use(
 		emiddleware.CORSWithConfig(
@@ -25,6 +28,9 @@ func New(
 			},
 		),
 	)
+
+	// Добавляем middleware для сбора метрик
+	e.Use(middleware.PrometheusMiddleware())
 
 	//e.Use(middleware.SlogLogger())
 

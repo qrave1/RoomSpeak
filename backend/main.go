@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/qrave1/RoomSpeak/backend/cmd"
+	"github.com/qrave1/RoomSpeak/cmd"
 )
 
 func main() {

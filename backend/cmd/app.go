@@ -7,14 +7,15 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/qrave1/RoomSpeak/backend/internal/application/config"
-	"github.com/qrave1/RoomSpeak/backend/internal/application/constant"
-	memory2 "github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/memory"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/postgres"
-	repository2 "github.com/qrave1/RoomSpeak/backend/internal/infra/adapters/postgres/repository"
-	handlers2 "github.com/qrave1/RoomSpeak/backend/internal/infra/ports/http/handlers"
-	"github.com/qrave1/RoomSpeak/backend/internal/infra/ports/http/server"
-	usecase2 "github.com/qrave1/RoomSpeak/backend/internal/usecase"
+	"github.com/qrave1/RoomSpeak/internal/application/config"
+	"github.com/qrave1/RoomSpeak/internal/application/constant"
+	"github.com/qrave1/RoomSpeak/internal/application/metric"
+	memory2 "github.com/qrave1/RoomSpeak/internal/infra/adapters/memory"
+	"github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres"
+	repository2 "github.com/qrave1/RoomSpeak/internal/infra/adapters/postgres/repository"
+	handlers2 "github.com/qrave1/RoomSpeak/internal/infra/ports/http/handlers"
+	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/server"
+	usecase2 "github.com/qrave1/RoomSpeak/internal/usecase"
 )
 
 func runApp() {
@@ -62,27 +63,48 @@ func runApp() {
 
 	echoSrv := server.New(cfg, authHandler, channelHandler, iceHandler, wsHandler)
 
-	srvCh := make(chan error, 1)
+	metricsSrv := metric.NewServer()
+
+	echoSrvCh := make(chan error, 1)
+	metricsSrvCh := make(chan error, 1)
+
+	// Запускаем HTTP сервер
 	go func() {
-		srvCh <- echoSrv.Start(":" + cfg.Port)
+		echoSrvCh <- echoSrv.Start(":" + cfg.Port)
 	}()
 
+	// Запускаем сервер метрик
+	go func() {
+		metricsSrvCh <- metricsSrv.Start(":" + cfg.MetricPort)
+	}()
+
+	// Ожидаем сигнал завершения или ошибку сервера
 	select {
 	case <-ctx.Done():
-		slog.Info("Shutting down server due to context cancel")
-	case <-srvCh:
+		slog.Info("Shutting down servers due to context cancel")
+	case err := <-echoSrvCh:
 		slog.Error(
 			"HTTP server failed",
 			slog.Any(constant.Error, err),
 		)
-
+		os.Exit(1)
+	case err := <-metricsSrvCh:
+		slog.Error(
+			"Metrics server failed",
+			slog.Any(constant.Error, err),
+		)
 		os.Exit(1)
 	}
 
+	// Graceful shutdown
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer timeoutCancel()
 
 	if err := echoSrv.Shutdown(timeoutCtx); err != nil {
-		slog.Error("Failed to gracefully shutdown server", slog.Any(constant.Error, err))
+		slog.Error("Failed to gracefully shutdown HTTP server", slog.Any(constant.Error, err))
+	}
+
+	if err := metricsSrv.Shutdown(timeoutCtx); err != nil {
+		slog.Error("Failed to gracefully shutdown metric server", slog.Any(constant.Error, err))
 	}
 }
