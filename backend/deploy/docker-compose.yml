@@ -1,0 +1,63 @@
+volumes:
+  roomspeak_pg_data:
+
+services:
+  roomspeak:
+    image: ghcr.io/qrave1/roomspeak:latest
+    container_name: roomspeak-backend
+    profiles: [ app ]
+    restart: always
+    env_file: .env
+    ports:
+      - "3000:3000"
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.app.rule=Host(`xxsm.ru`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls.certresolver=myresolver"
+      - "traefik.http.services.app.loadbalancer.server.port=3000"
+
+  migrate:
+    image: ghcr.io/qrave1/roomspeak:latest
+    container_name: migrate
+    command: [ "./build", "migrate", "up" ]
+    profiles: [ migrate ]
+    restart: no
+    env_file: .env
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: roomspeak-postgres
+    profiles: [ infra ]
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=roomspeak
+    volumes:
+      - roomspeak_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - default
+
+  coturn:
+    image: coturn/coturn:4.7-alpine
+    container_name: coturn
+    profiles: [ coturn ]
+    command: [ "-c", "/etc/coturn/coturn.conf" ]
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./coturn.conf:/etc/coturn/coturn.conf
+
+  grafana-alloy:
+    image: grafana/alloy:latest
+    container_name: grafana-alloy
+    restart: unless-stopped
+    volumes:
+      - ./vps/config.alloy:/etc/alloy/config.alloy
+    command: [ "run", "/etc/alloy/config.alloy" ]
+    network_mode: "host"

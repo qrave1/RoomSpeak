@@ -5,7 +5,7 @@
 ### TODO List
 - [ ] Auto reconnects for ws + peer
 - [ ] Settings saving
-- [ ] Online Users
+- [x] Online Users
 
 ### Tech List
 
