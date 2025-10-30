@@ -56,7 +56,7 @@ func runApp() {
 	peerUsecase := usecase.NewPeerUsecase(cfg, pcConnRepo, wsConnRepo, activeUserRepo)
 	signalingUsecase := usecase.NewSignalingUsecase(channelRepo, userRepo, pcConnRepo, wsConnRepo, activeUserRepo, peerUsecase)
 
-	authHandler := handlers.NewAuthHandler(userUsecase)
+	authHandler := handlers.NewAuthHandler(cfg, userUsecase)
 	channelHandler := handlers.NewChannelHandler(channelUsecase, userRepo)
 	iceHandler := handlers.NewIceHandler(cfg)
 	wsHandler := handlers.NewWebSocketHandler(cfg, signalingUsecase, wsConnRepo)

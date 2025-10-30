@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/qrave1/RoomSpeak/internal/application/config"
 	"github.com/qrave1/RoomSpeak/internal/application/constant"
 	"github.com/qrave1/RoomSpeak/internal/infra/appctx"
 	"github.com/qrave1/RoomSpeak/internal/infra/ports/http/dto"
@@ -13,11 +15,13 @@ import (
 )
 
 type AuthHandler struct {
+	cfg         *config.Config
 	userUsecase usecase.UserUsecase
 }
 
-func NewAuthHandler(userUsecase usecase.UserUsecase) *AuthHandler {
+func NewAuthHandler(cfg *config.Config, userUsecase usecase.UserUsecase) *AuthHandler {
 	return &AuthHandler{
+		cfg:         cfg,
 		userUsecase: userUsecase,
 	}
 }
@@ -55,16 +59,24 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "could not create token"})
 	}
 
-	c.SetCookie(&http.Cookie{
+	cookie := &http.Cookie{
 		Name:     "jwt",
 		Value:    token,
 		Expires:  time.Now().Add(72 * time.Hour),
-		Domain:   ".xxsm.ru",
 		Path:     "/",
 		Secure:   true,
 		HttpOnly: true,
 		SameSite: http.SameSiteNoneMode,
-	})
+	}
+
+	if h.cfg.Debug {
+		cookie.Domain = "localhost"
+		cookie.HttpOnly = false
+	} else {
+		cookie.Domain = ".xxsm.ru"
+	}
+
+	c.SetCookie(cookie)
 
 	return c.NoContent(http.StatusOK)
 }

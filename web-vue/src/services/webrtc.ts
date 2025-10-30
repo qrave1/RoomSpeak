@@ -109,7 +109,7 @@ class WebRTCService {
         await this.peerConnection.setLocalDescription(answer)
 
         wsService.send({
-            type: 'offer',
+            type: 'answer',
             data: {
                 sdp: answer.sdp
             }

@@ -84,29 +84,71 @@ func (p *peerUsecase) CreateWebrtcPeer(ctx context.Context, userID uuid.UUID, ch
 	return peer, nil
 }
 
-func (p *peerUsecase) broadcastRTP(ctx context.Context, pkt *rtp.Packet, userID uuid.UUID, channelID uuid.UUID) {
+func (p *peerUsecase) broadcastRTP(ctx context.Context, pkt *rtp.Packet, senderID uuid.UUID, channelID uuid.UUID) {
 	activeUsers := p.activeUserRepo.GetInChannel(ctx, channelID)
 
 	for _, activeUser := range activeUsers {
-		if activeUser.ID == userID {
+		if activeUser.ID == senderID {
 			continue
 		}
 
-		pc, ok := p.pcRepo.Get(activeUser.ID)
+		receiverPeer, ok := p.pcRepo.Get(activeUser.ID)
 		if !ok {
-			slog.Error("get peer connection in broadcast")
+			slog.Error("get peer connection in broadcast", slog.Any(constant.UserID, activeUser.ID))
 			continue
 		}
 
-		err := pc.AudioTrack.WriteRTP(pkt)
+		// Получаем или создаем трек для отправителя
+		audioTrack, exists := receiverPeer.GetAudioTrack(senderID)
+		if !exists {
+			if err := receiverPeer.AddAudioTrack(senderID); err != nil {
+				slog.Error(
+					"failed to add audio track",
+					slog.Any(constant.Error, err),
+					slog.String("sender_id", senderID.String()),
+					slog.String("receiver_id", activeUser.ID.String()),
+				)
+				continue
+			}
 
+			audioTrack, exists = receiverPeer.GetAudioTrack(senderID)
+			if !exists {
+				slog.Error("audio track not found after creation")
+				continue
+			}
+
+			// Необходимо пере-согласовать соединение после добавления нового трека
+			go p.renegotiate(ctx, activeUser.ID, receiverPeer)
+		}
+
+		err := audioTrack.WriteRTP(pkt)
 		if err != nil {
 			slog.Error(
 				"write RTP",
 				slog.Any(constant.Error, err),
-				slog.Any(constant.UserID, userID),
+				slog.String("sender_id", senderID.String()),
+				slog.String("receiver_id", activeUser.ID.String()),
 				slog.Any(constant.ChannelID, channelID),
 			)
 		}
 	}
+}
+
+// renegotiate выполняет пере-согласование WebRTC соединения
+func (p *peerUsecase) renegotiate(ctx context.Context, userID uuid.UUID, peer *domain.Peer) {
+	offer, err := peer.Conn.CreateOffer(nil)
+	if err != nil {
+		slog.Error("failed to create offer for renegotiation", slog.Any(constant.Error, err))
+		return
+	}
+
+	if err = peer.Conn.SetLocalDescription(offer); err != nil {
+		slog.Error("failed to set local description for renegotiation", slog.Any(constant.Error, err))
+		return
+	}
+
+	p.wsRepo.Write(userID, map[string]any{
+		"type": "offer",
+		"sdp":  offer.SDP,
+	})
 }

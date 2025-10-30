@@ -78,10 +78,12 @@ func (s *signalingUsecase) HandleJoin(ctx context.Context, userID uuid.UUID, joi
 		return nil
 	}
 
+	// Получаем список уже активных пользователей в канале
+	existingUsers := s.activeUserRepo.GetInChannel(ctx, channelID)
+
 	peer, err := s.peerUsecase.CreateWebrtcPeer(ctx, userID, channelID)
 	if err != nil {
 		slog.Error("create peer connection", slog.Any(constant.Error, err))
-
 		return nil
 	}
 
@@ -92,6 +94,31 @@ func (s *signalingUsecase) HandleJoin(ctx context.Context, userID uuid.UUID, joi
 		ChannelID: channelID,
 	}
 	s.activeUserRepo.Add(ctx, activeUser)
+
+	// Создаем треки для нового пользователя для каждого существующего участника
+	for _, existingUser := range existingUsers {
+		if err := peer.AddAudioTrack(existingUser.ID); err != nil {
+			slog.Error(
+				"failed to add audio track for existing user",
+				slog.Any(constant.Error, err),
+				slog.String("new_user_id", userID.String()),
+				slog.String("existing_user_id", existingUser.ID.String()),
+			)
+		}
+
+		// Создаем трек для нового пользователя у каждого существующего участника
+		existingPeer, ok := s.pcRepo.Get(existingUser.ID)
+		if ok {
+			if err := existingPeer.AddAudioTrack(userID); err != nil {
+				slog.Error(
+					"failed to add audio track for new user",
+					slog.Any(constant.Error, err),
+					slog.String("existing_user_id", existingUser.ID.String()),
+					slog.String("new_user_id", userID.String()),
+				)
+			}
+		}
+	}
 
 	if err = s.BroadcastActiveMembers(ctx, channelID); err != nil {
 		return fmt.Errorf("broadcast active members: %w", err)
@@ -141,11 +168,25 @@ func (s *signalingUsecase) HandleLeave(ctx context.Context, userID uuid.UUID) er
 		return fmt.Errorf("peer connection not found")
 	}
 
-	s.activeUserRepo.Remove(ctx, userID)
+	channelID := peer.ChannelID
 
+	// Удаляем треки этого пользователя у всех остальных участников
+	activeUsers := s.activeUserRepo.GetInChannel(ctx, channelID)
+	for _, activeUser := range activeUsers {
+		if activeUser.ID == userID {
+			continue
+		}
+
+		otherPeer, ok := s.pcRepo.Get(activeUser.ID)
+		if ok {
+			otherPeer.RemoveAudioTrack(userID)
+		}
+	}
+
+	s.activeUserRepo.Remove(ctx, userID)
 	s.pcRepo.Remove(userID)
 
-	if err := s.BroadcastActiveMembers(ctx, peer.ChannelID); err != nil {
+	if err := s.BroadcastActiveMembers(ctx, channelID); err != nil {
 		return fmt.Errorf("broadcast active members: %w", err)
 	}
 

@@ -18,7 +18,7 @@ export async function handleWSMessage(event, pc, updateParticipants, updateDetai
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             this.ws.send(JSON.stringify({
-                type: 'offer',
+                type: 'answer',
                 data: {
                     sdp: answer.sdp
                 }

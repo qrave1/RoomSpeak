@@ -23,7 +23,13 @@ func New(
 	e.Use(
 		emiddleware.CORSWithConfig(
 			emiddleware.CORSConfig{
-				AllowOrigins:     []string{cfg.Domain},
+				AllowOriginFunc: func(origin string) (bool, error) {
+					if cfg.Debug {
+						return true, nil
+					}
+
+					return cfg.Domain == origin, nil
+				},
 				AllowCredentials: true,
 			},
 		),
