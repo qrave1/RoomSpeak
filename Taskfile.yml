@@ -16,6 +16,7 @@ tasks:
     dir: backend/
     cmds:
       - docker build -t {{.BACK_TAG}} .
+      - docker tag {{.BACK_TAG}} {{.REGISTRY}}:latest
 
   back:push:
     desc: Build and push Docker image to registry
@@ -23,6 +24,7 @@ tasks:
     deps: [ back:build ]
     cmds:
       - docker push {{.BACK_TAG}}
+      - docker push {{.REGISTRY}}:latest
 
   back:deploy:
     desc: Build, push, update deployment.yaml and apply

@@ -1,40 +1,11 @@
-networks:
-  traefik:
-    driver: bridge
-
 volumes:
   roomspeak_pg_data:
 
 services:
-  traefik:
-    image: traefik:v3.5.1
-    container_name: traefik
-    profiles: [deploy]
-    restart: always
-    command:
-      - --configFile=/etc/traefik/traefik.yml
-    ports:
-      - "80:80"
-      - "443:443"
-    networks:
-      - traefik
-    volumes:
-      - ./traefik.yml:/etc/traefik/traefik.yml
-      - ./dynamic.yml:/etc/traefik/dynamic.yml
-      - ./acme.json:/acme.json
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    labels:
-      # Дашборд Traefik с BasicAuth
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.xxsm.ru`)"
-      - "traefik.http.routers.traefik-dashboard.entrypoints=web"
-      - "traefik.http.routers.traefik-dashboard.service=api@internal"
-      - "traefik.http.routers.traefik-dashboard.middlewares=auth-dashboard@file"
-
   roomspeak:
     image: ghcr.io/qrave1/roomspeak:latest
     container_name: roomspeak-backend
-    profiles: [app]
+    profiles: [ app ]
     restart: always
     env_file: .env
     ports:
@@ -51,15 +22,15 @@ services:
   migrate:
     image: ghcr.io/qrave1/roomspeak:latest
     container_name: migrate
-    command: ["./build", "migrate", "up"]
-    profiles: [migrate]
+    command: [ "./build", "migrate", "up" ]
+    profiles: [ migrate ]
     restart: no
     env_file: .env
 
   postgres:
     image: postgres:17-alpine
     container_name: roomspeak-postgres
-    profiles: [infra]
+    profiles: [ infra ]
     restart: unless-stopped
     environment:
       - POSTGRES_USER=postgres
@@ -75,9 +46,18 @@ services:
   coturn:
     image: coturn/coturn:4.7-alpine
     container_name: coturn
-    profiles: [coturn]
-    command: ["-c", "/etc/coturn/coturn.conf"]
+    profiles: [ coturn ]
+    command: [ "-c", "/etc/coturn/coturn.conf" ]
     restart: unless-stopped
     network_mode: "host"
     volumes:
       - ./coturn.conf:/etc/coturn/coturn.conf
+
+  grafana-alloy:
+    image: grafana/alloy:latest
+    container_name: grafana-alloy
+    restart: unless-stopped
+    volumes:
+      - ./vps/config.alloy:/etc/alloy/config.alloy
+    command: [ "run", "/etc/alloy/config.alloy" ]
+    network_mode: "host"
